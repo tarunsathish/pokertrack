@@ -374,14 +374,17 @@ textarea:focus {
 .view {
   flex: 1;
   overflow-y: auto;
-  padding: calc(16px + var(--pad-top)) 20px calc(96px + var(--pad-bottom));
+  padding: calc(16px + var(--pad-top)) 20px calc(104px + max(8px, calc(var(--pad-bottom) - 14px)));
   -webkit-overflow-scrolling: touch;
 }
 
 /* floating liquid-glass capsule tab bar */
 .tabbar {
   position: fixed;
-  bottom: calc(4px + var(--pad-bottom));
+  /* Sits just clear of the home indicator rather than above the whole safe
+     area — 4px + a 34px inset floated it ~38px off the bottom, which reads
+     as detached on a phone. */
+  bottom: max(8px, calc(var(--pad-bottom) - 14px));
   touch-action: none;
   left: 0;
   right: 0;
@@ -502,10 +505,14 @@ h2 {
   padding-top: 12px;
   border-top: 1px solid var(--sep);
 }
+.statline .stat {
+  min-width: 0;
+}
 .statline .stat b {
   display: block;
   font-family: var(--round);
-  font-size: 19px;
+  /* long money figures (-$1749.25) crowd three columns on a narrow phone */
+  font-size: clamp(15px, 4.4vw, 19px);
   font-weight: 600;
   letter-spacing: -0.3px;
   font-variant-numeric: tabular-nums;
@@ -707,6 +714,64 @@ h2 {
   margin-right: -8px;
 }
 
+/* ---------- inline field rows ----------
+   iOS settings shape: label on the left, the editable value right-aligned on
+   the same line. A stack of caps labels over full-width inputs eats roughly
+   three times the height and reads like a web form, not a phone app. */
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 14px;
+  min-height: 52px;
+}
+.field-row > label {
+  flex: 1;
+  margin: 0;
+  font-size: 16px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  min-width: 0;
+}
+.field-row input,
+.field-row textarea {
+  width: auto;
+  flex: 0 1 46%;
+  text-align: right;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+  padding: 8px 0;
+  font-variant-numeric: tabular-nums;
+}
+.field-row input:focus,
+.field-row textarea:focus {
+  box-shadow: none;
+  border: none;
+  color: var(--brass-bright);
+}
+.field-row input::placeholder {
+  color: var(--ink-3);
+}
+/* a row whose value is display-only */
+.field-row .val {
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.field-row.stack {
+  display: block;
+  padding: 12px 14px;
+}
+.field-row.stack textarea {
+  width: 100%;
+  text-align: left;
+  margin-top: 6px;
+  flex: none;
+}
+
 /* ---------- settings controls ----------
    Row subtitles truncate by default (a hand's note shouldn't wrap a list),
    but a settings row's subtitle is explanatory copy and has to be readable. */
@@ -790,12 +855,16 @@ h2 {
   background: var(--brass);
   color: #241b06;
 }
-/* the face rides above the action and carries the row's own background so
-   the action never shows through */
+/* The face is translucent so the group's glass shows through, which means it
+   cannot hide the action behind it — the action hides itself instead. Without
+   this, a red delete panel bleeds through every row at rest. */
+.swipe-action.closed {
+  opacity: 0;
+  pointer-events: none;
+}
 .swipe-face {
   position: relative;
   z-index: 1;
-  background: color-mix(in srgb, var(--felt-800) 62%, transparent);
   will-change: transform;
 }
 

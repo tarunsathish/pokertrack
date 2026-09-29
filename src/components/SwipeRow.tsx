@@ -26,7 +26,7 @@ export function SwipeRow({
   return (
     <div className="swipe-row">
       <button
-        className={`swipe-action${armed ? ' armed' : ''}`}
+        className={`swipe-action${armed ? ' armed' : ''}${swipe.open ? '' : ' closed'}`}
         style={{ width: swipe.actionWidth }}
         tabIndex={swipe.open ? 0 : -1}
         aria-hidden={!swipe.open}

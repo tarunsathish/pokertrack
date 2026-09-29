@@ -32,3 +32,17 @@ export function fmtBB(cents: Cents, bb: Cents): string {
   const rounded = Math.round(v * 10) / 10
   return `${Number.isInteger(rounded) ? rounded : rounded.toFixed(1)}bb`
 }
+
+/**
+ * Display size for a hero money figure, in px. `clamp()` can't see how many
+ * characters it's sizing, so "+$95" and "-$57,725.15" would render at the same
+ * size and the long one overflows the 430px column. Steps down by length.
+ */
+export function heroFontSize(text: string): number {
+  const n = text.length
+  if (n <= 6) return 62
+  if (n <= 8) return 54
+  if (n <= 10) return 46
+  if (n <= 12) return 39
+  return 33
+}

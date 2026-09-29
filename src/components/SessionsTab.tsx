@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type Session } from '../db'
-import { fmt, fmtSigned } from '../engine/money'
+import { fmt, fmtSigned, heroFontSize } from '../engine/money'
 import {
   bankrollCurve,
   fmtDuration,
@@ -97,7 +97,12 @@ export function SessionsTab({ onToast }: { onToast: (msg: string) => void }) {
   return (
     <div className="view">
       <p className="screen-cap">Bankroll</p>
-      <h1 className={`money hero ${t.net >= 0 ? 'pos-win' : 'pos-lose'}`}>{fmtSigned(t.net)}</h1>
+      <h1
+        className={`money hero ${t.net >= 0 ? 'pos-win' : 'pos-lose'}`}
+        style={{ fontSize: heroFontSize(fmtSigned(t.net)) }}
+      >
+        {fmtSigned(t.net)}
+      </h1>
       <p className="hero-sub small">
         {t.sessions === 0
           ? 'No finished sessions yet'

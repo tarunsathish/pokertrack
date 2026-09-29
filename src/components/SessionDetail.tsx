@@ -1,9 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, type HandRecord, type Session } from '../db'
-import { fmt, fmtSigned, parseCents, type Cents } from '../engine/money'
+import { fmt, fmtSigned, parseCents, type Cents, heroFontSize } from '../engine/money'
 import {
   bbPerHour,
+  breakMs,
   fmtDuration,
   hourly,
   invested,
@@ -25,7 +26,7 @@ function toLocalInput(ts: number): string {
   )}`
 }
 
-/** A money field that only commits when it parses, so a half-typed value never saves. */
+/** An inline label/value row that only commits when the text parses. */
 function MoneyField({
   label,
   cents,
@@ -39,26 +40,28 @@ function MoneyField({
   placeholder?: string
   allowEmpty?: boolean
 }) {
-  const [text, setText] = useState(cents === null ? '' : fmt(cents).replace('$', ''))
+  // Keep the "$" in the field: parseCents strips currency symbols and commas,
+  // so it round-trips, and a bare "2000" reads ambiguously in a list of stakes.
+  const asText = (c: Cents | null) => (c === null ? '' : fmt(c))
+  const [text, setText] = useState(asText(cents))
   const parsed = parseCents(text)
   const empty = text.trim() === ''
-  const bad = empty ? !allowEmpty : parsed === null
 
   return (
-    <div>
+    <div className="field-row">
       <label>{label}</label>
       <input
         inputMode="decimal"
-        placeholder={placeholder}
+        placeholder={placeholder ?? '0.00'}
         value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => {
           if (empty && allowEmpty) return onCommit(null)
           if (parsed !== null) return onCommit(parsed)
           // Unparseable: snap back to the stored value rather than saving garbage.
-          setText(cents === null ? '' : fmt(cents).replace('$', ''))
+          setText(asText(cents))
         }}
-        style={bad && !empty ? { borderColor: 'var(--loss)' } : undefined}
+        style={!empty && parsed === null ? { color: 'var(--loss)' } : undefined}
       />
     </div>
   )
@@ -129,63 +132,72 @@ export function SessionDetail({
       </div>
 
       <div className="entry-summary" style={{ paddingBottom: 24 }}>
-        <p className="screen-cap num">
-          {fmt(session.sb)}/{fmt(session.bb)} · {session.tableSize} players
-          {live ? (onBreak(session) ? ' · on break' : ' · live') : ''}
-        </p>
-        {net === null ? (
-          <h1 className="money hero faint">—</h1>
-        ) : (
-          <h1 className={`money hero ${net >= 0 ? 'pos-win' : 'pos-lose'}`}>{fmtSigned(net)}</h1>
-        )}
-
-        <div className="statline" style={{ marginBottom: 24 }}>
-          <div className="stat">
-            <b className="num">{fmtDuration(ms)}</b>
-            <span>at the table</span>
-          </div>
-          <div className="stat">
-            <b className={`money ${(rate ?? 0) >= 0 ? 'pos-win' : 'pos-lose'}`}>
-              {rate !== null ? fmtSigned(rate) : '—'}
-            </b>
-            <span>per hour</span>
-          </div>
-          <div className="stat">
-            <b className="num">
-              {bbHr !== null ? `${bbHr >= 0 ? '+' : ''}${bbHr.toFixed(1)}` : '—'}
-            </b>
-            <span>bb / hour</span>
+        <div className="surface">
+          <p className="live-status">
+            {live && <span className={`live-dot${onBreak(session) ? ' paused' : ''}`} />}
+            <span className="num">
+              {fmt(session.sb)}/{fmt(session.bb)}
+            </span>
+            <span className="dim"> · {session.tableSize} players</span>
+            {live ? <span className="dim"> · {onBreak(session) ? 'on break' : 'live'}</span> : null}
+          </p>
+          {net === null ? (
+            <h1 className="money hero faint">—</h1>
+          ) : (
+            <h1
+              className={`money hero ${net >= 0 ? 'pos-win' : 'pos-lose'}`}
+              style={{ fontSize: heroFontSize(fmtSigned(net)) }}
+            >
+              {fmtSigned(net)}
+            </h1>
+          )}
+          <p className="hero-sub small">
+            {session.cashOut === null
+              ? `In for ${fmt(inFor)} — no cash-out recorded yet`
+              : `${fmt(inFor)} in, ${fmt(session.cashOut)} out`}
+          </p>
+          <div className="statline panel-stats">
+            <div className="stat">
+              <b className="num">{fmtDuration(ms)}</b>
+              <span>at the table</span>
+            </div>
+            <div className="stat">
+              <b className={`money ${(rate ?? 0) >= 0 ? 'pos-win' : 'pos-lose'}`}>
+                {rate !== null ? fmtSigned(rate) : '—'}
+              </b>
+              <span>per hour</span>
+            </div>
+            <div className="stat">
+              <b className="num">
+                {bbHr !== null ? `${bbHr >= 0 ? '+' : ''}${bbHr.toFixed(1)}` : '—'}
+              </b>
+              <span>bb / hour</span>
+            </div>
           </div>
         </div>
 
         <h2>The money</h2>
-        <div className="row">
-          <MoneyField label="Small blind $" cents={session.sb} onCommit={(v) => v !== null && save({ sb: v })} />
-          <MoneyField label="Big blind $" cents={session.bb} onCommit={(v) => v !== null && save({ bb: v })} />
-        </div>
-        <div className="row">
+        <div className="group">
+          <MoneyField label="Small blind" cents={session.sb} onCommit={(v) => v !== null && save({ sb: v })} />
+          <MoneyField label="Big blind" cents={session.bb} onCommit={(v) => v !== null && save({ bb: v })} />
+          <MoneyField label="Buy-in" cents={session.buyIn} onCommit={(v) => v !== null && save({ buyIn: v })} />
           <MoneyField
-            label="Buy-in $"
-            cents={session.buyIn}
-            onCommit={(v) => v !== null && save({ buyIn: v })}
-          />
-          <MoneyField
-            label="Cashed out $"
+            label="Cashed out"
             cents={session.cashOut}
             allowEmpty
             placeholder="not yet"
             onCommit={(v) => save({ cashOut: v })}
           />
+          {(session.rebuys?.length ?? 0) > 0 && (
+            <div className="field-row">
+              <label>Total in</label>
+              <span className="val money">
+                {fmt(inFor)}
+                <span className="faint small"> · {session.rebuys!.length} rebuy</span>
+              </span>
+            </div>
+          )}
         </div>
-        <p className="small dim" style={{ marginTop: 2, lineHeight: 1.45 }}>
-          In for {fmt(inFor)}
-          {(session.rebuys?.length ?? 0) > 0
-            ? ` — ${fmt(session.buyIn)} buy-in plus ${session.rebuys!.length} rebuy${
-                session.rebuys!.length === 1 ? '' : 's'
-              }`
-            : ''}
-          .
-        </p>
 
         {(session.rebuys?.length ?? 0) > 0 && (
           <>
@@ -216,68 +228,88 @@ export function SessionDetail({
           </>
         )}
 
-        <h2>Where</h2>
-        <input
-          value={venue}
-          placeholder="Venue"
-          onChange={(e) => setVenue(e.target.value)}
-          onBlur={() => save({ venue: venue.trim() })}
-        />
-
-        <h2>How it went</h2>
-        <textarea
-          rows={3}
-          placeholder="Table read, stop-loss calls, how you felt — the stuff that isn't in the numbers."
-          value={note}
-          onChange={(e) => setNote(e.target.value)}
-          onBlur={() => save({ note: note.trim() })}
-        />
+        <h2>Details</h2>
+        <div className="group">
+          <div className="field-row">
+            <label>Venue</label>
+            <input
+              value={venue}
+              placeholder="Not set"
+              onChange={(e) => setVenue(e.target.value)}
+              onBlur={() => save({ venue: venue.trim() })}
+            />
+          </div>
+          <div className="field-row stack">
+            <label>How it went</label>
+            <textarea
+              rows={3}
+              placeholder="Table read, stop-loss calls, how you felt — the stuff that isn't in the numbers."
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              onBlur={() => save({ note: note.trim() })}
+            />
+          </div>
+        </div>
 
         <h2>Time</h2>
-        {editingTimes ? (
-          <div className="row" style={{ alignItems: 'flex-end' }}>
-            <div>
-              <label>Started</label>
-              <input
-                type="datetime-local"
-                value={toLocalInput(session.startedAt)}
-                onChange={(e) => {
-                  const ts = new Date(e.target.value).getTime()
-                  if (!Number.isNaN(ts)) save({ startedAt: ts })
-                }}
-              />
-            </div>
-            <div>
-              <label>Ended</label>
-              <input
-                type="datetime-local"
-                value={session.endedAt ? toLocalInput(session.endedAt) : ''}
-                onChange={(e) => {
-                  const ts = new Date(e.target.value).getTime()
-                  if (!Number.isNaN(ts)) save({ endedAt: ts })
-                }}
-              />
-            </div>
-          </div>
-        ) : (
-          <button className="btn" style={{ width: '100%' }} onClick={() => setEditingTimes(true)}>
-            {new Date(session.startedAt).toLocaleTimeString(undefined, {
-              hour: 'numeric',
-              minute: '2-digit'
-            })}
-            {' → '}
-            {session.endedAt
-              ? new Date(session.endedAt).toLocaleTimeString(undefined, {
+        <div className="group">
+          {editingTimes ? (
+            <>
+              <div className="field-row">
+                <label>Started</label>
+                <input
+                  type="datetime-local"
+                  value={toLocalInput(session.startedAt)}
+                  onChange={(e) => {
+                    const ts = new Date(e.target.value).getTime()
+                    if (!Number.isNaN(ts)) save({ startedAt: ts })
+                  }}
+                />
+              </div>
+              <div className="field-row">
+                <label>Ended</label>
+                <input
+                  type="datetime-local"
+                  value={session.endedAt ? toLocalInput(session.endedAt) : ''}
+                  onChange={(e) => {
+                    const ts = new Date(e.target.value).getTime()
+                    if (!Number.isNaN(ts)) save({ endedAt: ts })
+                  }}
+                />
+              </div>
+              <button className="field-row" onClick={() => setEditingTimes(false)}>
+                <label style={{ color: 'var(--brass)' }}>Done editing times</label>
+              </button>
+            </>
+          ) : (
+            <button className="field-row" onClick={() => setEditingTimes(true)}>
+              <label>Played</label>
+              <span className="val">
+                {new Date(session.startedAt).toLocaleTimeString(undefined, {
                   hour: 'numeric',
                   minute: '2-digit'
-                })
-              : 'still playing'}
-            {(session.breaks?.length ?? 0) > 0 ? ` · ${session.breaks!.length} break` : ''}
-            {' · edit'}
-          </button>
-        )}
+                })}
+                {' \u2192 '}
+                {session.endedAt
+                  ? new Date(session.endedAt).toLocaleTimeString(undefined, {
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })
+                  : 'now'}
+              </span>
+            </button>
+          )}
+          {(session.breaks?.length ?? 0) > 0 && (
+            <div className="field-row">
+              <label>Breaks</label>
+              <span className="val">
+                {session.breaks!.length} · {fmtDuration(breakMs(session, now))} off the table
+              </span>
+            </div>
+          )}
+        </div>
         {ms === 0 && session.endedAt !== null && (
-          <p className="small" style={{ color: 'var(--loss)', marginTop: 6, lineHeight: 1.45 }}>
+          <p className="small" style={{ color: 'var(--loss)', margin: '8px 4px 0', lineHeight: 1.45 }}>
             The end time isn't after the start time, so there's no duration to rate. Fix the times
             above and the hourly figures come back.
           </p>

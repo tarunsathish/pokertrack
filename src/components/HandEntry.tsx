@@ -71,7 +71,10 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
   // Hole cards are optional and can be filled in after the hand. Someone
   // glancing at the phone at the table can read them, so the flow must never
   // force them onto the screen while you're still in the pot.
-  const [cardsDeferred, setCardsDeferred] = useState((draft?.heroCards ?? []).length === 0 && (draft?.events ?? []).length > 0)
+  // Defaults to true: cards get recorded after the hand, not before it. The
+  // slots stay tappable if you want them in early, and the result screen
+  // prompts for them once nobody's looking at your phone.
+  const [cardsDeferred, setCardsDeferred] = useState(true)
   const [cardsHidden, setCardsHidden] = useState(loadSettings().hideHoleCards)
 
   const changeTableSize = (n: number) => {

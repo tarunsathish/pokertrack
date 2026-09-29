@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseCents, fmt, fmtBB } from './money'
+import { parseCents, fmt, fmtBB, heroFontSize } from './money'
 import { positionsFor, preflopOrder, postflopOrder, nextPosition } from './positions'
 import { computePots, distributePots } from './pots'
 import { replayHand, heroResult, needsShowdown, isAllInRunout, type HandSetup, type HandEvent } from './hand'
@@ -276,5 +276,26 @@ describe('hand replay', () => {
     const setup = microSetup()
     const state = replayHand(setup, [{ type: 'action', pos: 'UTG', verb: 'check' }])
     expect(state.error).toMatch(/cannot check/)
+  })
+})
+
+describe('hero sizing', () => {
+  it('keeps short figures large and steps long ones down', () => {
+    expect(heroFontSize('+$95')).toBe(62)
+    expect(heroFontSize('-$250')).toBe(62)
+    expect(heroFontSize('+$1,250')).toBe(54)
+    expect(heroFontSize('-$57725.15')).toBe(46)
+  })
+
+  it('shrinks monotonically as the figure grows', () => {
+    const sizes = ['+$5', '+$500', '+$50000', '+$5000000', '+$500000000'].map(heroFontSize)
+    for (let i = 1; i < sizes.length; i++) expect(sizes[i]).toBeLessThanOrEqual(sizes[i - 1])
+  })
+
+  it('never returns a size that would overflow the 430px column', () => {
+    // ~0.62em average advance for SF Rounded tabular digits
+    for (const t of ['+$95', '-$57725.15', '-$1234567.89', '-$999999999.99']) {
+      expect(heroFontSize(t) * 0.62 * t.length).toBeLessThan(430)
+    }
   })
 })

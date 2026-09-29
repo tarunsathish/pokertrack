@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, sessionInvested, type Session, type HandRecord } from '../db'
-import { fmt, fmtSigned, parseCents, type Cents } from '../engine/money'
+import { fmt, fmtSigned, parseCents, type Cents, heroFontSize } from '../engine/money'
 import {
   fmtAgo,
   fmtDuration,
@@ -299,7 +299,10 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
           </span>
           {session.venue ? <span className="dim"> · {session.venue}</span> : ''}
         </p>
-        <h1 className={`money hero ${heroValue >= 0 ? 'pos-win' : 'pos-lose'}`}>
+        <h1
+          className={`money hero ${heroValue >= 0 ? 'pos-win' : 'pos-lose'}`}
+          style={{ fontSize: heroFontSize(fmtSigned(heroValue)) }}
+        >
           {fmtSigned(heroValue)}
         </h1>
         <p className="hero-sub small">
