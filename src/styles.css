@@ -72,13 +72,33 @@
   --spec-strong: inset 0 1px 0 rgba(255, 255, 255, 0.26),
     inset 0 -1px 0 rgba(255, 255, 255, 0.06);
 
-  /* card material — raised, blurred, lit */
-  --card-fill: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.085),
-    rgba(255, 255, 255, 0.035)
-  );
+  /* Card material. Real Liquid Glass refracts at the rim — the highlight
+     lives around the perimeter and varies with the surface normal against a
+     fixed light. A top-to-bottom sheen is the frosted-glass shortcut and
+     reads as 2010 gloss, so there is no fill gradient here at all: surfaces
+     are a flat translucent fill plus the rim pass below.
+     (True refraction needs backdrop feDisplacementMap, which Safari doesn't
+     support — rim light is the honest approximation on iPhone.) */
   --card-blur: blur(30px) saturate(175%);
+
+  /* light comes from upper-left, so that edge burns brightest and the
+     opposite edge catches only a faint bounce */
+  --rim: linear-gradient(
+    142deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.14) 24%,
+    rgba(255, 255, 255, 0.03) 48%,
+    rgba(255, 255, 255, 0.16) 100%
+  );
+  --rim-strong: linear-gradient(
+    142deg,
+    rgba(255, 255, 255, 0.72) 0%,
+    rgba(255, 255, 255, 0.2) 24%,
+    rgba(255, 255, 255, 0.04) 48%,
+    rgba(255, 255, 255, 0.24) 100%
+  );
+  /* light gathering just inside the edge — the lensing cue */
+  --lens: inset 0 0 14px rgba(255, 255, 255, 0.05);
 
   --r-chip: 10px;
   --r-btn: 16px;
@@ -153,7 +173,7 @@ body::before {
   background-image:
     radial-gradient(120% 52% at 50% -8%, var(--lamplight), transparent 66%),
     radial-gradient(90% 44% at 12% 104%, var(--lamplight), transparent 70%),
-    linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.32)),
+    linear-gradient(180deg, transparent 55%, rgba(0, 0, 0, 0.18)),
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 }
 
@@ -226,6 +246,87 @@ textarea:focus {
   color: var(--ink-stock);
 }
 
+/* ---------- rim light ----------
+   A 1px gradient ring painted only on the border box, via a two-layer mask
+   that punches the content box out. This is what makes the edge read as a
+   refracting lens rather than a painted outline: brightness travels around
+   the perimeter instead of washing down the face. */
+.rimlit {
+  position: relative;
+}
+.rimlit::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--rim);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 1;
+}
+.rimlit.rim-strong::before {
+  background: var(--rim-strong);
+}
+
+
+/* ---------- rim pass on glass surfaces ----------
+   Applied by selector rather than a utility class so every existing surface
+   picks it up. The ring replaces the flat top-edge specular: brightness now
+   travels around the perimeter the way a lens catches a fixed light. */
+.group::before,
+.surface::before,
+.session-card::before,
+.btn::before,
+.chip::before,
+.stepper::before,
+.empty-state::before,
+.tabbar::before,
+.tab-lens::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1px;
+  background: var(--rim);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  pointer-events: none;
+  z-index: 2;
+}
+.surface::before,
+.tabbar::before,
+.tab-lens::before {
+  background: var(--rim-strong);
+}
+/* the ring needs a positioned host */
+.session-card,
+.btn,
+.chip,
+.stepper,
+.empty-state {
+  position: relative;
+}
+/* a filled control is opaque — the rim would read as a painted outline */
+.btn.primary::before,
+.chip.on::before,
+.btn.quiet::before {
+  display: none;
+}
+
 /* numerals & voices */
 .num {
   font-variant-numeric: tabular-nums;
@@ -292,11 +393,10 @@ textarea:focus {
   padding: 6px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--felt-800) 46%, transparent);
-  background-image: var(--card-fill);
   backdrop-filter: blur(36px) saturate(190%);
   -webkit-backdrop-filter: blur(36px) saturate(190%);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--spec-strong), var(--lift-3);
+  box-shadow: var(--lens), var(--lift-3);
 }
 /* full-screen flows (hand entry, hand detail) take over — the tab bar
    gets out of the way so it can never cover the input panel */
@@ -312,9 +412,8 @@ body:has(.overlay) .tabbar {
   width: calc((100% - 14px) / var(--tab-count, 4));
   border-radius: 999px;
   background: var(--glass-strong);
-  background-image: var(--card-fill);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: var(--spec-strong), 0 2px 8px rgba(0, 0, 0, 0.28);
+  box-shadow: var(--lens), 0 2px 8px rgba(0, 0, 0, 0.28);
   transition: transform 380ms cubic-bezier(0.32, 1.32, 0.32, 1);
   pointer-events: none;
 }
@@ -424,11 +523,10 @@ h2 {
 .group {
   position: relative;
   background: color-mix(in srgb, var(--felt-800) 62%, transparent);
-  background-image: var(--card-fill);
   backdrop-filter: var(--card-blur);
   -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--spec), var(--lift-2);
+  box-shadow: var(--lens), var(--lift-2);
   border-radius: var(--r-card);
   overflow: hidden;
 }
@@ -444,9 +542,8 @@ h2 {
   min-height: 52px;
   border-radius: 999px;
   background: var(--glass);
-  background-image: var(--card-fill);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--spec), var(--lift-1);
+  box-shadow: var(--lens), var(--lift-1);
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
@@ -457,18 +554,16 @@ h2 {
 .btn:active {
   transform: scale(0.97);
   background: var(--glass-strong);
-  box-shadow: var(--spec), 0 1px 2px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 .btn.primary {
   background: var(--brass);
-  background-image: linear-gradient(180deg, var(--brass-bright), var(--brass));
   border-color: transparent;
   color: #241b06;
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.45),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42),
     0 3px 10px rgba(0, 0, 0, 0.32),
-    0 10px 28px rgba(160, 118, 40, 0.22);
+    0 10px 28px rgba(160, 118, 40, 0.18);
 }
 .btn.primary:active {
   background: var(--brass-bright);
@@ -488,9 +583,8 @@ h2 {
   padding: 0 15px;
   border-radius: 999px;
   background: var(--glass);
-  background-image: var(--card-fill);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--spec), var(--lift-1);
+  box-shadow: var(--lens), var(--lift-1);
   font-size: 15px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -505,11 +599,10 @@ h2 {
 }
 .chip.on {
   background: var(--brass);
-  background-image: linear-gradient(180deg, var(--brass-bright), var(--brass));
   border-color: transparent;
   color: #241b06;
   font-weight: 600;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.38), 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 .chip.sm {
   min-height: 32px;
@@ -576,6 +669,136 @@ h2 {
   color: var(--ink-small);
 }
 
+/* ---------- hole-card privacy ----------
+   Cards are blurred until tapped so a neighbour glancing over can't read
+   them. The blur is on the cards only — position and board stay legible. */
+.hero-cards {
+  position: relative;
+  display: inline-block;
+}
+.hero-cards.hidden .cards-row {
+  filter: blur(9px) saturate(0.6);
+  opacity: 0.75;
+}
+.hero-cards .peek {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -17px;
+  text-align: center;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-small);
+  padding: 4px 0;
+}
+.hero-cards.hidden .peek {
+  color: var(--brass);
+}
+
+/* "Add later" escape inside a prompt line */
+.panel-skip {
+  margin-left: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--brass);
+  padding: 6px 8px;
+  margin-right: -8px;
+}
+
+/* ---------- settings controls ----------
+   Row subtitles truncate by default (a hand's note shouldn't wrap a list),
+   but a settings row's subtitle is explanatory copy and has to be readable. */
+.group.prose .hand-row {
+  align-items: flex-start;
+}
+.group.prose .hand-row .meta .line2 {
+  white-space: normal;
+  overflow: visible;
+  line-height: 1.4;
+  margin-top: 3px;
+}
+.group.prose .toggle,
+.group.prose .dot-state,
+.group.prose .faint {
+  margin-top: 2px;
+}
+
+.toggle {
+  width: 51px;
+  height: 31px;
+  border-radius: 999px;
+  background: var(--glass);
+  border: 1px solid var(--glass-edge);
+  flex-shrink: 0;
+  position: relative;
+  transition: background 200ms ease;
+}
+.toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  background: var(--ink);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  transition: transform 220ms var(--ease-out);
+}
+.toggle.on {
+  background: var(--brass);
+  border-color: transparent;
+}
+.toggle.on::after {
+  transform: translateX(20px);
+}
+/* status pip — state as a dot, per the rule that colour lands on data */
+.dot-state {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--ink-4);
+  flex-shrink: 0;
+}
+.dot-state.ok {
+  background: var(--win);
+}
+
+/* ---------- swipe actions ---------- */
+.swipe-row {
+  position: relative;
+  overflow: hidden;
+}
+.swipe-action {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--loss);
+  color: #2a0d09;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: background 140ms ease;
+}
+.swipe-action.armed {
+  background: var(--brass);
+  color: #241b06;
+}
+/* the face rides above the action and carries the row's own background so
+   the action never shows through */
+.swipe-face {
+  position: relative;
+  z-index: 1;
+  background: color-mix(in srgb, var(--felt-800) 62%, transparent);
+  will-change: transform;
+}
+
 /* month bucket heading with its own subtotal on the right */
 .month-head {
   display: flex;
@@ -586,7 +809,7 @@ h2 {
 
 /* stats sitting inside a panel share its surface, so the divider is a
    hairline rather than the panel's own top border */
-.panel .hero {
+.surface .hero {
   font-size: clamp(46px, 13.5vw, 58px);
 }
 .panel-stats {
@@ -688,9 +911,8 @@ label {
   display: flex;
   align-items: center;
   background: var(--glass);
-  background-image: var(--card-fill);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--spec), var(--lift-1);
+  box-shadow: var(--lens), var(--lift-1);
   border-radius: 999px;
 }
 /* quiet-tier variant: flat, shorter, still a 44px target */
@@ -860,12 +1082,16 @@ button.mini-card::after {
 }
 
 /* action timeline */
+/* Action log. One row per action ran the full width and pushed a four-street
+   hand off the bottom of the screen behind the keypad. Actions now wrap
+   inline within their street, so a whole hand reads as four short paragraphs
+   and stays on one screen. */
 .timeline {
-  margin-top: 14px;
+  margin-top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  font-size: 15px;
+  gap: 2px;
+  font-size: 14.5px;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
 }
@@ -873,16 +1099,33 @@ button.mini-card::after {
   color: var(--ink-small);
   font-weight: 600;
   text-transform: uppercase;
-  font-size: 11px;
-  letter-spacing: 0.05em;
-  margin-top: 8px;
+  font-size: 10.5px;
+  letter-spacing: 0.07em;
+  margin-top: 10px;
+  margin-bottom: 3px;
 }
-.timeline .t-row { display: flex; gap: 10px; }
+.t-street-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 0;
+  align-items: baseline;
+}
+.timeline .t-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  padding-right: 10px;
+  white-space: nowrap;
+}
 .timeline .t-pos {
-  width: 58px;
   font-weight: 600;
   color: var(--ink-2);
   flex-shrink: 0;
+}
+/* folds are the least interesting thing in a hand — keep them present but
+   let the eye skip them */
+.t-fold {
+  font-size: 13px;
 }
 .t-fold { color: var(--ink-3); }
 .t-call { color: var(--ink-2); }
@@ -1122,26 +1365,26 @@ button.mini-card::after {
 
 .session-card {
   background: color-mix(in srgb, var(--felt-800) 62%, transparent);
-  background-image: var(--card-fill);
   backdrop-filter: var(--card-blur);
   -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--spec), var(--lift-2);
+  box-shadow: var(--lens), var(--lift-2);
   border-radius: var(--r-card);
   padding: 18px;
   margin-bottom: 12px;
 }
 
 /* The hero surface: chart, live-session readout — the one card per screen
-   that should read as genuinely floating rather than merely grouped. */
-.panel {
+   that should read as genuinely floating rather than merely grouped.
+   NB: `.panel` is already the hand-entry bottom sheet — different component,
+   different name. */
+.surface {
   position: relative;
   background: color-mix(in srgb, var(--felt-800) 56%, transparent);
-  background-image: var(--card-fill);
   backdrop-filter: var(--card-blur);
   -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--spec-strong), var(--lift-3);
+  box-shadow: var(--lens), var(--lift-3);
   border-radius: var(--r-card);
   padding: 18px 16px 14px;
   margin-bottom: 18px;

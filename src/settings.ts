@@ -14,6 +14,7 @@ export interface AppSettings {
   lastVenue: string
   lastBuyIn: Cents
   displayBB: boolean // show amounts in bb instead of $
+  hideHoleCards: boolean // blur your own cards until tapped — for use at the table
   tagPresets: string[]
   theme: ThemeId
 }
@@ -50,6 +51,7 @@ const defaults: AppSettings = {
   lastVenue: '',
   lastBuyIn: 2000,
   displayBB: false,
+  hideHoleCards: false,
   tagPresets: DEFAULT_TAGS,
   theme: 'felt'
 }

@@ -289,7 +289,7 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
     <div className="view">
       {/* The live session is one object on the table: status, result, and the
           numbers behind it share a surface instead of floating separately. */}
-      <div className="panel live-panel">
+      <div className="surface live-panel">
         <p className="live-status">
           <span className={`live-dot${paused ? ' paused' : ''}`} />
           {paused ? 'On break' : 'Live'}

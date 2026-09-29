@@ -1,7 +1,8 @@
 import Dexie, { type Table } from 'dexie'
 import type { HandEvent, HandSetup } from './engine/hand'
 import type { Cents } from './engine/money'
-import { invested, type SessionBreak, type StackMark } from './engine/sessions'
+import { invested, netFinal, tableMs, type SessionBreak, type StackMark } from './engine/sessions'
+import { toCsv, dollars } from './engine/csv'
 
 export interface Session {
   id?: number
@@ -94,4 +95,87 @@ export async function importAll(json: string): Promise<{ sessions: number; hands
     await db.hands.bulkAdd(data.hands)
   })
   return { sessions: data.sessions.length, hands: data.hands.length }
+}
+
+// ---------- spreadsheet export ----------
+
+const iso = (ts: number) => new Date(ts).toISOString()
+
+/** One row per session, with the derived figures a spreadsheet can't recompute. */
+export async function exportSessionsCsv(): Promise<string> {
+  const sessions = await db.sessions.orderBy('startedAt').toArray()
+  const hands = await db.hands.toArray()
+  const handCount = new Map<number, number>()
+  for (const h of hands) handCount.set(h.sessionId, (handCount.get(h.sessionId) ?? 0) + 1)
+
+  const now = Date.now()
+  const rows = sessions.map((s) => {
+    const net = netFinal(s)
+    const ms = tableMs(s, now)
+    const hours = ms / 3600000
+    return [
+      s.id ?? '',
+      iso(s.startedAt),
+      s.endedAt ? iso(s.endedAt) : '',
+      hours.toFixed(2),
+      s.venue,
+      dollars(s.sb),
+      dollars(s.bb),
+      s.tableSize,
+      dollars(invested(s)),
+      s.cashOut === null ? '' : dollars(s.cashOut),
+      net === null ? '' : dollars(net),
+      net === null || hours <= 0 ? '' : dollars(Math.round(net / hours)),
+      net === null || hours <= 0 || s.bb <= 0 ? '' : (net / s.bb / hours).toFixed(2),
+      (s.rebuys ?? []).length,
+      (s.breaks ?? []).length,
+      handCount.get(s.id!) ?? 0,
+      s.note ?? ''
+    ]
+  })
+
+  return toCsv(
+    [
+      'session_id', 'started_at', 'ended_at', 'hours', 'venue', 'sb', 'bb', 'table_size',
+      'invested', 'cashed_out', 'net', 'per_hour', 'bb_per_hour', 'rebuys', 'breaks',
+      'hands_logged', 'note'
+    ],
+    rows
+  )
+}
+
+/** One row per logged hand. */
+export async function exportHandsCsv(): Promise<string> {
+  const [hands, sessions] = await Promise.all([db.hands.orderBy('ts').toArray(), db.sessions.toArray()])
+  const byId = new Map(sessions.map((s) => [s.id!, s]))
+
+  const rows = hands.map((h) => [
+    h.id ?? '',
+    h.sessionId,
+    iso(h.ts),
+    byId.get(h.sessionId)?.venue ?? '',
+    dollars(h.sb),
+    dollars(h.bb),
+    h.setup.tableSize,
+    h.heroPos,
+    h.heroCards.join(' '),
+    h.board.join(' '),
+    dollars(h.potTotal),
+    dollars(h.result),
+    h.bb > 0 ? (h.result / h.bb).toFixed(1) : '',
+    h.tags.join('; '),
+    h.flagged ? 'yes' : '',
+    h.reviewed ? 'yes' : '',
+    h.note,
+    h.reviewNote
+  ])
+
+  return toCsv(
+    [
+      'hand_id', 'session_id', 'played_at', 'venue', 'sb', 'bb', 'table_size', 'position',
+      'hole_cards', 'board', 'pot', 'net', 'net_bb', 'tags', 'flagged', 'reviewed',
+      'note', 'review_note'
+    ],
+    rows
+  )
 }

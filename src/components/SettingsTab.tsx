@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { exportAll, importAll, db } from '../db'
+import { exportAll, exportHandsCsv, exportSessionsCsv, importAll, db } from '../db'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { loadSettings, saveSettings, applyTheme, THEMES, type ThemeId } from '../settings'
 
@@ -14,7 +14,14 @@ export function SettingsTab({ onToast }: { onToast: (msg: string) => void }) {
   const [persisted, setPersisted] = useState<boolean | null>(null)
   const [confirmWipe, setConfirmWipe] = useState(false)
   const [theme, setTheme] = useState<ThemeId>(() => loadSettings().theme)
+  const [hideCards, setHideCards] = useState(() => loadSettings().hideHoleCards)
   const fileRef = useRef<HTMLInputElement>(null)
+
+  const toggleHideCards = () => {
+    const next = !hideCards
+    setHideCards(next)
+    saveSettings({ ...loadSettings(), hideHoleCards: next })
+  }
 
   const pickTheme = (id: ThemeId) => {
     setTheme(id)
@@ -30,11 +37,9 @@ export function SettingsTab({ onToast }: { onToast: (msg: string) => void }) {
     navigator.storage?.persisted?.().then(setPersisted).catch(() => setPersisted(null))
   }, [])
 
-  const doExport = async () => {
-    const json = await exportAll()
-    const file = new File([json], `pokertrack-backup-${new Date().toISOString().slice(0, 10)}.json`, {
-      type: 'application/json'
-    })
+  /** Hand the file to the iOS share sheet, falling back to a download. */
+  const deliver = async (name: string, type: string, body: string) => {
+    const file = new File([body], name, { type })
     if (navigator.canShare?.({ files: [file] })) {
       try {
         await navigator.share({ files: [file] })
@@ -49,6 +54,16 @@ export function SettingsTab({ onToast }: { onToast: (msg: string) => void }) {
     a.download = file.name
     a.click()
     URL.revokeObjectURL(url)
+  }
+
+  const stamp = () => new Date().toISOString().slice(0, 10)
+
+  const doExport = () =>
+    exportAll().then((j) => deliver(`pokertrack-backup-${stamp()}.json`, 'application/json', j))
+
+  const doCsv = async (which: 'sessions' | 'hands') => {
+    const body = which === 'sessions' ? await exportSessionsCsv() : await exportHandsCsv()
+    await deliver(`pokertrack-${which}-${stamp()}.csv`, 'text/csv', body)
   }
 
   const doImport = async (f: File) => {
@@ -89,22 +104,72 @@ export function SettingsTab({ onToast }: { onToast: (msg: string) => void }) {
         </div>
       )}
 
-      <h2>Your data</h2>
-      <div className="session-card">
-        <p className="small dim" style={{ lineHeight: 1.6 }}>
-          {counts ? `${counts.hands} hands · ${counts.sessions} sessions` : '…'} — stored only on this
-          device.
-          <br />
-          Storage protection:{' '}
-          {persisted === null ? 'unknown' : persisted ? '✓ protected by iOS' : 'not yet granted (install the app to enable)'}
-        </p>
-      </div>
-      <div className="row" style={{ marginBottom: 20 }}>
-        <button className="btn" onClick={doExport}>
-          Back up (JSON)
+      <h2>At the table</h2>
+      <div className="group prose">
+        <button className="hand-row" onClick={toggleHideCards}>
+          <div className="meta">
+            <div className="line1">Hide my hole cards</div>
+            <div className="line2">Blur them until tapped, so a neighbour can't read your hand</div>
+          </div>
+          <span className={`toggle${hideCards ? ' on' : ''}`} role="switch" aria-checked={hideCards} />
         </button>
-        <button className="btn" onClick={() => fileRef.current?.click()}>
-          Restore backup
+      </div>
+
+      <h2>Your data</h2>
+      <div className="group prose">
+        <div className="hand-row">
+          <div className="meta">
+            <div className="line1">On this device</div>
+            <div className="line2">
+              {counts ? `${counts.hands} hands · ${counts.sessions} sessions` : '…'} — never leaves
+              your phone
+            </div>
+          </div>
+        </div>
+        <div className="hand-row">
+          <div className="meta">
+            <div className="line1">Storage protection</div>
+            <div className="line2">
+              {persisted === null
+                ? 'Unknown'
+                : persisted
+                  ? 'Granted — iOS won\u2019t evict your data'
+                  : 'Not granted — install to the home screen to enable'}
+            </div>
+          </div>
+          <span className={`dot-state${persisted ? ' ok' : ''}`} />
+        </div>
+      </div>
+
+      <h2>Export</h2>
+      <div className="group prose">
+        <button className="hand-row" onClick={() => doCsv('sessions')}>
+          <div className="meta">
+            <div className="line1">Sessions spreadsheet</div>
+            <div className="line2">CSV — opens in Excel or Numbers, one row per session</div>
+          </div>
+          <span className="faint">›</span>
+        </button>
+        <button className="hand-row" onClick={() => doCsv('hands')}>
+          <div className="meta">
+            <div className="line1">Hands spreadsheet</div>
+            <div className="line2">CSV — one row per logged hand, with cards and result</div>
+          </div>
+          <span className="faint">›</span>
+        </button>
+        <button className="hand-row" onClick={doExport}>
+          <div className="meta">
+            <div className="line1">Full backup</div>
+            <div className="line2">JSON — the only format that can be restored below</div>
+          </div>
+          <span className="faint">›</span>
+        </button>
+        <button className="hand-row" onClick={() => fileRef.current?.click()}>
+          <div className="meta">
+            <div className="line1">Restore from backup</div>
+            <div className="line2">Replaces everything on this device</div>
+          </div>
+          <span className="faint">›</span>
         </button>
         <input
           ref={fileRef}
@@ -118,10 +183,9 @@ export function SettingsTab({ onToast }: { onToast: (msg: string) => void }) {
           }}
         />
       </div>
-
-      <p className="small faint" style={{ lineHeight: 1.5 }}>
-        Tip: back up once in a while and AirDrop the file to your Mac. Restoring replaces everything on this
-        device with the backup's contents.
+      <p className="small faint" style={{ lineHeight: 1.5, margin: '8px 4px 0' }}>
+        Spreadsheets are for reading your results elsewhere — they can't be imported back. Keep a JSON
+        backup for that.
       </p>
 
       <h2>Danger zone</h2>

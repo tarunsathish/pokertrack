@@ -5,6 +5,7 @@ import { SessionsTab } from './components/SessionsTab'
 import { StatsTab } from './components/StatsTab'
 import { SettingsTab } from './components/SettingsTab'
 import { SpadeIcon, CardsIcon, ChipStackIcon, ChartIcon, SlidersIcon } from './components/Icons'
+import { useTabSwipe } from './gestures'
 
 type Tab = 'play' | 'hands' | 'sessions' | 'stats' | 'settings'
 
@@ -27,35 +28,18 @@ export default function App() {
   const [handsSeed, setHandsSeed] = useState<'review' | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const toastTimer = useRef<number | undefined>(undefined)
-  const touchStart = useRef<{ x: number; y: number; skip: boolean } | null>(null)
   const barRef = useRef<HTMLElement>(null)
 
-  // swipe left/right anywhere on a main screen to change tabs
-  const onTouchStart = (e: React.TouchEvent) => {
-    const t = e.touches[0]
-    const el = e.target as Element
-    touchStart.current = {
-      x: t.clientX,
-      y: t.clientY,
-      // don't hijack horizontal scrollers, text fields, or full-screen flows
-      skip: !!el.closest('.actor-row, input, textarea, .overlay, .tabbar')
+  // Swipe between tabs, tracking the finger (see gestures.ts).
+  const tabIdx = TAB_ORDER.indexOf(tab)
+  const swipe = useTabSwipe({
+    canGoNext: tabIdx < TAB_ORDER.length - 1,
+    canGoPrev: tabIdx > 0,
+    onCommit: (dir) => {
+      setSlide(dir === 1 ? 'left' : 'right')
+      setTab(TAB_ORDER[tabIdx + dir])
     }
-  }
-  const onTouchEnd = (e: React.TouchEvent) => {
-    const s = touchStart.current
-    touchStart.current = null
-    if (!s || s.skip) return
-    const t = e.changedTouches[0]
-    const dx = t.clientX - s.x
-    const dy = t.clientY - s.y
-    if (Math.abs(dx) < 60 || Math.abs(dx) < 2 * Math.abs(dy)) return
-    const i = TAB_ORDER.indexOf(tab)
-    const next = TAB_ORDER[i + (dx < 0 ? 1 : -1)]
-    if (next) {
-      setSlide(dx < 0 ? 'left' : 'right')
-      setTab(next)
-    }
-  }
+  })
 
   // hold the tab bar and drag — the lens scrubs with your finger
   const idxFromX = (clientX: number) => {
@@ -117,9 +101,9 @@ export default function App() {
     <div className="app">
       <div
         key={tab}
-        className={`tab-view${slide ? ` slide-${slide}` : ''}`}
-        onTouchStart={onTouchStart}
-        onTouchEnd={onTouchEnd}
+        className={`tab-view${slide && !swipe.dragging ? ` slide-${slide}` : ''}`}
+        style={swipe.style}
+        {...swipe.handlers}
       >
         {tab === 'play' && <PlayTab onToast={showToast} />}
         {tab === 'hands' && <HandsTab seed={handsSeed} onSeedConsumed={() => setHandsSeed(null)} />}

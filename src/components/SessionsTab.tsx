@@ -12,6 +12,7 @@ import {
   totals
 } from '../engine/sessions'
 import { BankrollChart } from './BankrollChart'
+import { SwipeRow } from './SwipeRow'
 import { SessionDetail } from './SessionDetail'
 import { ChipRing } from './Icons'
 
@@ -51,6 +52,8 @@ function SessionRow({ s, onClick }: { s: Session; onClick: () => void }) {
 
 export function SessionsTab({ onToast }: { onToast: (msg: string) => void }) {
   const [openId, setOpenId] = useState<number | null>(null)
+  // which row's swipe-delete is armed — first tap arms, second deletes
+  const [armedId, setArmedId] = useState<number | null>(null)
   const sessions = useLiveQuery(() => db.sessions.toArray(), [])
 
   const now = Date.now()
@@ -103,7 +106,7 @@ export function SessionsTab({ onToast }: { onToast: (msg: string) => void }) {
 
       {/* Chart and the rates it produces belong on one surface — they're one
           reading, not three things that happen to be stacked. */}
-      <div className="panel" style={{ marginTop: 20 }}>
+      <div className="surface" style={{ marginTop: 20 }}>
         {curve.length > 0 ? (
           <BankrollChart points={curve} />
         ) : (
@@ -137,7 +140,22 @@ export function SessionsTab({ onToast }: { onToast: (msg: string) => void }) {
           </h2>
           <div className="group">
             {g.list.map((s) => (
-              <SessionRow key={s.id} s={s} onClick={() => setOpenId(s.id!)} />
+              <SwipeRow
+                key={s.id}
+                armed={armedId === s.id}
+                onAction={async () => {
+                  if (armedId !== s.id) return setArmedId(s.id!)
+                  const n = await db.hands.where('sessionId').equals(s.id!).count()
+                  await db.transaction('rw', db.sessions, db.hands, async () => {
+                    await db.hands.where('sessionId').equals(s.id!).delete()
+                    await db.sessions.delete(s.id!)
+                  })
+                  setArmedId(null)
+                  onToast(n > 0 ? `Session and ${n} hand${n === 1 ? '' : 's'} deleted` : 'Session deleted')
+                }}
+              >
+                <SessionRow s={s} onClick={() => setOpenId(s.id!)} />
+              </SwipeRow>
             ))}
           </div>
         </div>

@@ -7,7 +7,8 @@ import {
   type HandEvent,
   type HandSetup,
   type HandState,
-  type Street
+  type Street,
+  STREETS
 } from '../engine/hand'
 import { positionsFor } from '../engine/positions'
 import { fmt, fmtBB, fmtSigned, type Cents } from '../engine/money'
@@ -16,6 +17,7 @@ import { CardKeypad } from './CardKeypad'
 import { BetPad } from './BetPad'
 import { CardsRow } from './MiniCard'
 import { useSwipeBack } from '../useSwipeBack'
+import { loadSettings, saveSettings } from '../settings'
 
 const DRAFT_KEY = 'pokertrack-draft'
 
@@ -66,6 +68,11 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
   const [note, setNote] = useState('')
   const [flagged, setFlagged] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  // Hole cards are optional and can be filled in after the hand. Someone
+  // glancing at the phone at the table can read them, so the flow must never
+  // force them onto the screen while you're still in the pot.
+  const [cardsDeferred, setCardsDeferred] = useState((draft?.heroCards ?? []).length === 0 && (draft?.events ?? []).length > 0)
+  const [cardsHidden, setCardsHidden] = useState(loadSettings().hideHoleCards)
 
   const changeTableSize = (n: number) => {
     setTableSize(n)
@@ -98,6 +105,12 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
 
   const clearDraft = () => localStorage.removeItem(DRAFT_KEY)
 
+  const toggleHidden = () => {
+    const next = !cardsHidden
+    setCardsHidden(next)
+    saveSettings({ ...loadSettings(), hideHoleCards: next })
+  }
+
   const seats = positionsFor(tableSize)
   const lastShowdownIdx = events.findIndex((e) => e.type === 'showdown')
   const shown: Record<string, Card[]> =
@@ -115,7 +128,8 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
   type Phase = 'cards' | 'action' | 'bet' | 'board' | 'showdown' | 'result' | 'shown-cards' | 'position'
   let phase: Phase
   if (posEdit) phase = 'position'
-  else if (editSlot !== null || heroCards.length < 2) phase = 'cards'
+  else if (editSlot !== null || (heroCards.length < 2 && !cardsDeferred && events.length === 0))
+    phase = 'cards'
   else if (shownEntry) phase = 'shown-cards'
   else if (betMode) phase = 'bet'
   else if (!state.handOver && state.toAct !== null) phase = 'action'
@@ -261,12 +275,23 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
             >
               You · <b style={{ color: 'var(--brass)' }}>{heroPos}</b> <span className="faint">✎</span>
             </button>
-            <CardsRow
-              cards={heroCards}
-              count={2}
-              activeIndex={editSlot ?? (phase === 'cards' ? heroCards.length : undefined)}
-              onSlot={(i) => heroCards[i] && setEditSlot(i)}
-            />
+            <div className={`hero-cards${cardsHidden && heroCards.length > 0 ? ' hidden' : ''}`}>
+              <CardsRow
+                cards={heroCards}
+                count={2}
+                activeIndex={editSlot ?? (phase === 'cards' ? heroCards.length : undefined)}
+                onSlot={(i) => (heroCards[i] ? setEditSlot(i) : setEditSlot(i))}
+              />
+              {heroCards.length > 0 && (
+                <button
+                  className="peek"
+                  aria-label={cardsHidden ? 'Show your cards' : 'Hide your cards'}
+                  onClick={toggleHidden}
+                >
+                  {cardsHidden ? 'tap to show' : 'hide'}
+                </button>
+              )}
+            </div>
           </div>
           <div style={{ flex: 1 }} />
           <div style={{ flex: 'none' }}>
@@ -284,29 +309,38 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
         </div>
 
         <div className="timeline">
-          {state.log.map((a, i) => {
-            const first = i === 0 || state.log[i - 1].street !== a.street
-            return (
-              <div key={i}>
-                {first && <div className="t-street">{a.street}</div>}
-                <div className="t-row">
-                  <span className="t-pos">{a.pos}</span>
-                  <span
-                    className={
-                      a.verb === 'fold' ? 't-fold' : a.verb === 'allin' ? 't-allin' : a.verb === 'bet' || a.verb === 'raise' ? 't-raise' : 't-call'
-                    }
-                  >
-                    {a.verb === 'fold' && 'folds'}
-                    {a.verb === 'check' && 'checks'}
-                    {a.verb === 'call' && 'calls'}
-                    {a.verb === 'bet' && `bets ${fmt(a.to ?? 0)}`}
-                    {a.verb === 'raise' && `raises to ${fmt(a.to ?? 0)}`}
-                    {a.verb === 'allin' && `all-in ${fmt(a.to ?? 0)}`}
-                  </span>
-                </div>
+          {STREETS.filter((st) => state.log.some((a) => a.street === st)).map((st) => (
+            <div key={st}>
+              <div className="t-street">{st}</div>
+              <div className="t-street-group">
+                {state.log
+                  .filter((a) => a.street === st)
+                  .map((a, i) => (
+                    <span className="t-row" key={i}>
+                      <span className="t-pos">{a.pos === heroPos ? 'You' : a.pos}</span>
+                      <span
+                        className={
+                          a.verb === 'fold'
+                            ? 't-fold'
+                            : a.verb === 'allin'
+                              ? 't-allin'
+                              : a.verb === 'bet' || a.verb === 'raise'
+                                ? 't-raise'
+                                : 't-call'
+                        }
+                      >
+                        {a.verb === 'fold' && 'folds'}
+                        {a.verb === 'check' && 'checks'}
+                        {a.verb === 'call' && 'calls'}
+                        {a.verb === 'bet' && fmt(a.to ?? 0)}
+                        {a.verb === 'raise' && `to ${fmt(a.to ?? 0)}`}
+                        {a.verb === 'allin' && `all-in ${fmt(a.to ?? 0)}`}
+                      </span>
+                    </span>
+                  ))}
               </div>
-            )
-          })}
+            </div>
+          ))}
           {Object.entries(shown).map(([pos, cs]) => (
             <div className="t-row" key={pos}>
               <span className="t-pos">{pos}</span>
@@ -381,6 +415,11 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
                 <>
                   Your cards — <b>{heroCards.length === 0 ? 'first card' : 'second card'}</b>
                 </>
+              )}
+              {editSlot === null && (
+                <button className="panel-skip" onClick={() => setCardsDeferred(true)}>
+                  Add later
+                </button>
               )}
             </div>
             <CardKeypad used={usedCards} onCard={addCard} allowUnknownSuit />
@@ -528,6 +567,20 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
                     </button>
                   ))}
               </div>
+            )}
+            {/* The hand is over and nobody's looking at your phone any more —
+                this is the natural moment to record what you held. */}
+            {heroCards.length < 2 && (
+              <button
+                className="btn"
+                style={{ width: '100%', marginBottom: 10 }}
+                onClick={() => {
+                  setCardsDeferred(false)
+                  setEditSlot(heroCards.length)
+                }}
+              >
+                Add your cards{heroCards.length === 1 ? ' (1 to go)' : ''}
+              </button>
             )}
             <div className="chips" style={{ marginBottom: 10 }}>
               {tagPresets.map((t) => (

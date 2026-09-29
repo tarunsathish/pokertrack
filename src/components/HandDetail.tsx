@@ -4,6 +4,7 @@ import { replayHand } from '../engine/hand'
 import { fmt, fmtSigned, fmtBB } from '../engine/money'
 import { fmtCards } from '../engine/cards'
 import { CardsRow } from './MiniCard'
+import { CardKeypad } from './CardKeypad'
 import { DEFAULT_TAGS } from '../settings'
 import { useSwipeBack } from '../useSwipeBack'
 
@@ -47,6 +48,9 @@ export function HandDetail({ hand, onClose }: { hand: HandRecord; onClose: () =>
   const [reviewNote, setReviewNote] = useState(hand.reviewNote)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [copied, setCopied] = useState(false)
+  // Cards can be deferred during the hand (privacy at the table), so a saved
+  // hand has to be able to receive them afterwards.
+  const [cardSlot, setCardSlot] = useState<number | null>(null)
 
   const saveField = (patch: Partial<HandRecord>) => db.hands.update(hand.id!, patch)
 
@@ -93,7 +97,12 @@ export function HandDetail({ hand, onClose }: { hand: HandRecord; onClose: () =>
             <div className="small dim" style={{ marginBottom: 4 }}>
               You · <b style={{ color: 'var(--brass)' }}>{hand.heroPos}</b>
             </div>
-            <CardsRow cards={hand.heroCards} count={2} />
+            <CardsRow
+              cards={hand.heroCards}
+              count={2}
+              activeIndex={cardSlot ?? undefined}
+              onSlot={(i) => setCardSlot(i)}
+            />
           </div>
           <div style={{ flex: 1 }} />
           {state.board.length > 0 && (
@@ -146,6 +155,36 @@ export function HandDetail({ hand, onClose }: { hand: HandRecord; onClose: () =>
             </div>
           )}
         </div>
+
+        {cardSlot !== null ? (
+          <>
+            <h2>{hand.heroCards[cardSlot] ? `Replace card ${cardSlot + 1}` : 'Your cards'}</h2>
+            <CardKeypad
+              used={[...hand.heroCards, ...hand.board].filter((c) => c && c[1] !== 'x')}
+              allowUnknownSuit
+              onCard={(card) => {
+                const next = [...hand.heroCards]
+                next[cardSlot] = card
+                saveField({ heroCards: next })
+                // walk to the empty slot if there is one, else close
+                setCardSlot(next.length < 2 ? next.length : next[0] && next[1] ? null : cardSlot === 0 ? 1 : 0)
+              }}
+            />
+            <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => setCardSlot(null)}>
+              Done
+            </button>
+          </>
+        ) : (
+          hand.heroCards.filter(Boolean).length < 2 && (
+            <button
+              className="btn"
+              style={{ width: '100%', marginTop: 4 }}
+              onClick={() => setCardSlot(hand.heroCards.filter(Boolean).length)}
+            >
+              Add your cards
+            </button>
+          )
+        )}
 
         <h2>Tags</h2>
         <div className="chips" style={{ marginBottom: 8 }}>
