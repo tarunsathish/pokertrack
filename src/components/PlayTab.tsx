@@ -287,37 +287,50 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="view">
-      <p className="screen-cap num">
-        {paused ? 'On break' : 'Live'} · {fmt(session.sb)}/{fmt(session.bb)}
-        {session.venue ? ` · ${session.venue}` : ''}
-      </p>
-      <h1 className={`money hero ${heroValue >= 0 ? 'pos-win' : 'pos-lose'}`}>
-        {fmtSigned(heroValue)}
-      </h1>
-      <p className="hero-sub small">
-        {live !== null ? (
-          <>
-            from your {fmt(session.stack!.amount)} stack
-            {stackStale && <span className="faint"> · counted {fmtAgo(session.stack!.ts, now)}</span>}
-          </>
-        ) : (
-          <span className="dim">across {hands?.length ?? 0} logged hands — count your stack for a true figure</span>
-        )}
-      </p>
-      <div className="statline" style={{ marginBottom: 20 }}>
-        <div className="stat">
-          <b className="num">{hands?.length ?? 0}</b>
-          <span>hands logged</span>
-        </div>
-        <div className="stat">
-          <b className="num">{fmtDuration(tableMs(session, now))}</b>
-          <span>at the table</span>
-        </div>
-        <div className="stat">
-          <b className="money">{fmt(sessionInvested(session))}</b>
-          <span>
-            in for{(session.rebuys?.length ?? 0) > 0 ? ` · ${session.rebuys!.length} rebuy` : ''}
+      {/* The live session is one object on the table: status, result, and the
+          numbers behind it share a surface instead of floating separately. */}
+      <div className="panel live-panel">
+        <p className="live-status">
+          <span className={`live-dot${paused ? ' paused' : ''}`} />
+          {paused ? 'On break' : 'Live'}
+          <span className="faint"> · </span>
+          <span className="num">
+            {fmt(session.sb)}/{fmt(session.bb)}
           </span>
+          {session.venue ? <span className="dim"> · {session.venue}</span> : ''}
+        </p>
+        <h1 className={`money hero ${heroValue >= 0 ? 'pos-win' : 'pos-lose'}`}>
+          {fmtSigned(heroValue)}
+        </h1>
+        <p className="hero-sub small">
+          {live !== null ? (
+            <>
+              from your {fmt(session.stack!.amount)} stack
+              {stackStale && (
+                <span className="faint"> · counted {fmtAgo(session.stack!.ts, now)}</span>
+              )}
+            </>
+          ) : (
+            <span className="dim">
+              across {hands?.length ?? 0} logged hands — count your stack for a true figure
+            </span>
+          )}
+        </p>
+        <div className="statline panel-stats">
+          <div className="stat">
+            <b className="num">{hands?.length ?? 0}</b>
+            <span>hands logged</span>
+          </div>
+          <div className="stat">
+            <b className="num">{fmtDuration(tableMs(session, now))}</b>
+            <span>at the table</span>
+          </div>
+          <div className="stat">
+            <b className="money">{fmt(sessionInvested(session))}</b>
+            <span>
+              in for{(session.rebuys?.length ?? 0) > 0 ? ` · ${session.rebuys!.length} rebuy` : ''}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -350,17 +363,6 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
         </button>
       </div>
 
-      <div className="row" style={{ marginBottom: 10 }}>
-        <div className="stepper">
-          <button onClick={() => db.sessions.update(session.id!, { tableSize: Math.max(2, session.tableSize - 1) })}>
-            −
-          </button>
-          <span>{session.tableSize} players</span>
-          <button onClick={() => db.sessions.update(session.id!, { tableSize: Math.min(10, session.tableSize + 1) })}>
-            +
-          </button>
-        </div>
-      </div>
 
       {ending ? (
         <EndSessionForm
@@ -399,11 +401,33 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
           <button className="btn big" onClick={() => setRebuying(true)}>
             Rebuy
           </button>
-          <button className="btn big" onClick={() => setEnding(true)}>
+          <button className="btn big edge" onClick={() => setEnding(true)}>
             End session
           </button>
         </div>
       )}
+
+      <div className="quiet-tier">
+        <div className="stepper sm">
+          <button
+            aria-label="One fewer player"
+            onClick={() =>
+              db.sessions.update(session.id!, { tableSize: Math.max(2, session.tableSize - 1) })
+            }
+          >
+            −
+          </button>
+          <span>{session.tableSize} players</span>
+          <button
+            aria-label="One more player"
+            onClick={() =>
+              db.sessions.update(session.id!, { tableSize: Math.min(10, session.tableSize + 1) })
+            }
+          >
+            +
+          </button>
+        </div>
+      </div>
 
       {noteOpen ? (
         <div style={{ marginTop: 14 }}>
@@ -421,8 +445,8 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
         </div>
       ) : (
         <button
-          className="btn"
-          style={{ width: '100%', marginTop: 14 }}
+          className="btn quiet"
+          style={{ width: '100%' }}
           onClick={() => {
             setNoteText(session.note ?? '')
             setNoteOpen(true)

@@ -7,12 +7,15 @@
    centered phone column.
    ============================================================ */
 :root {
-  /* felt — background world (Settings → Table felt) */
-  --felt-950: #0a140e;
-  --felt-900: #0f1d14;
-  --felt-800: #15271c;
-  --felt-700: #1d3527;
-  --felt-600: #294936;
+  /* felt — background world (Settings → Table felt).
+     Lifted off near-black: Liquid Glass is a refractive material, and a
+     backdrop with no luminance or chroma gives it nothing to pick up. The
+     ladder keeps its relative steps, it just starts higher. */
+  --felt-950: #0c1712;
+  --felt-900: #12231a;
+  --felt-800: #1a3125;
+  --felt-700: #244233;
+  --felt-600: #325a46;
 
   /* card stock (playing cards) */
   --stock: #f6efdf;
@@ -49,16 +52,38 @@
   --sep: rgba(240, 236, 224, 0.08);
   --lamplight: rgba(178, 232, 187, 0.11);
 
-  /* liquid glass material */
+  /* ---- liquid glass material ----
+     Three ingredients, always together: a translucent fill, a specular edge
+     that catches light along the top, and an ambient shadow that proves the
+     surface is off the background. A fill on its own is a flat gray box. */
   --glass: rgba(255, 255, 255, 0.07);
   --glass-strong: rgba(255, 255, 255, 0.12);
-  --glass-edge: rgba(255, 255, 255, 0.1);
+  --glass-edge: rgba(255, 255, 255, 0.12);
   --glass-shine: inset 0 1px 0 rgba(255, 255, 255, 0.14);
 
-  --r-chip: 8px;
-  --r-btn: 14px;
-  --r-card: 18px;
-  --r-sheet: 30px;
+  /* elevation — offset + blur, never a zero-offset halo */
+  --lift-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 4px 12px rgba(0, 0, 0, 0.26);
+  --lift-2: 0 2px 4px rgba(0, 0, 0, 0.32), 0 10px 28px rgba(0, 0, 0, 0.36);
+  --lift-3: 0 4px 8px rgba(0, 0, 0, 0.34), 0 20px 48px rgba(0, 0, 0, 0.46);
+
+  /* the specular pass: bright hairline on top, faint catch underneath */
+  --spec: inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.04);
+  --spec-strong: inset 0 1px 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.06);
+
+  /* card material — raised, blurred, lit */
+  --card-fill: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.085),
+    rgba(255, 255, 255, 0.035)
+  );
+  --card-blur: blur(30px) saturate(175%);
+
+  --r-chip: 10px;
+  --r-btn: 16px;
+  --r-card: 22px;
+  --r-sheet: 32px;
 
   /* Apple type stacks */
   --sans: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'Segoe UI', sans-serif;
@@ -74,20 +99,20 @@
 
 /* ---------- table felts ---------- */
 :root[data-theme='midnight'] {
-  --felt-950: #090e18;
-  --felt-900: #0d1421;
-  --felt-800: #121b2d;
-  --felt-700: #1a2740;
-  --felt-600: #253655;
-  --lamplight: rgba(168, 198, 255, 0.1);
+  --felt-950: #0b1220;
+  --felt-900: #111a2d;
+  --felt-800: #18253e;
+  --felt-700: #213256;
+  --felt-600: #2e4673;
+  --lamplight: rgba(168, 198, 255, 0.16);
 }
 :root[data-theme='noir'] {
-  --felt-950: #0d0c0a;
-  --felt-900: #13110e;
-  --felt-800: #1a1813;
-  --felt-700: #24211a;
-  --felt-600: #322d23;
-  --lamplight: rgba(236, 214, 165, 0.08);
+  --felt-950: #14120e;
+  --felt-900: #1c1914;
+  --felt-800: #26221a;
+  --felt-700: #332d22;
+  --felt-600: #463d2e;
+  --lamplight: rgba(236, 214, 165, 0.13);
 }
 
 /* ---------- reset / base ---------- */
@@ -114,6 +139,11 @@ body {
   -webkit-user-select: none;
   -webkit-touch-callout: none;
 }
+/* The world the glass refracts. Three passes: a lamp above the table, a
+   cooler pool at the bottom so the tab bar has something to pick up, and a
+   fine grain so the large flat areas aren't dead. Without real variation
+   here, every blurred surface resolves to the same gray and the depth reads
+   as decoration. */
 body::before {
   content: '';
   position: fixed;
@@ -121,8 +151,10 @@ body::before {
   z-index: -1;
   pointer-events: none;
   background-image:
-    radial-gradient(130% 60% at 50% -12%, var(--lamplight), transparent 62%),
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.045'/%3E%3C/svg%3E");
+    radial-gradient(120% 52% at 50% -8%, var(--lamplight), transparent 66%),
+    radial-gradient(90% 44% at 12% 104%, var(--lamplight), transparent 70%),
+    linear-gradient(180deg, transparent 40%, rgba(0, 0, 0, 0.32)),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.05'/%3E%3C/svg%3E");
 }
 
 /* ---------- the phone template ---------- */
@@ -155,10 +187,12 @@ textarea {
   font: inherit;
   font-size: max(16px, 1em);
   color: var(--ink);
-  background: var(--glass);
+  background: rgba(0, 0, 0, 0.22);
   border: 1px solid var(--glass-edge);
+  /* recessed: fields are wells you type into, not surfaces that float */
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), inset 0 -1px 0 rgba(255, 255, 255, 0.05);
   border-radius: var(--r-btn);
-  padding: 12px 14px;
+  padding: 13px 15px;
   outline: none;
   width: 100%;
   user-select: text;
@@ -172,6 +206,7 @@ textarea::placeholder {
 input:focus,
 textarea:focus {
   border-color: var(--brass);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 0 0 3px var(--brass-hairline);
 }
 :focus-visible {
   outline: 2px solid var(--brass);
@@ -254,15 +289,14 @@ textarea:focus {
   max-width: calc(var(--phone-w) - 32px);
   z-index: 40;
   display: flex;
-  padding: 5px 6px;
+  padding: 6px 7px;
   border-radius: 999px;
-  background: color-mix(in srgb, var(--felt-800) 52%, transparent);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
+  background: color-mix(in srgb, var(--felt-800) 46%, transparent);
+  background-image: var(--card-fill);
+  backdrop-filter: blur(36px) saturate(190%);
+  -webkit-backdrop-filter: blur(36px) saturate(190%);
   border: 1px solid var(--glass-edge);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 12px 32px rgba(0, 0, 0, 0.45);
+  box-shadow: var(--spec-strong), var(--lift-3);
 }
 /* full-screen flows (hand entry, hand detail) take over — the tab bar
    gets out of the way so it can never cover the input panel */
@@ -271,14 +305,16 @@ body:has(.overlay) .tabbar {
 }
 .tab-lens {
   position: absolute;
-  top: 5px;
-  bottom: 5px;
-  left: 6px;
+  top: 6px;
+  bottom: 6px;
+  left: 7px;
   /* driven by App.tsx so the lens can never drift out of sync with the tab count */
-  width: calc((100% - 12px) / var(--tab-count, 4));
+  width: calc((100% - 14px) / var(--tab-count, 4));
   border-radius: 999px;
   background: var(--glass-strong);
-  box-shadow: var(--glass-shine);
+  background-image: var(--card-fill);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: var(--spec-strong), 0 2px 8px rgba(0, 0, 0, 0.28);
   transition: transform 380ms cubic-bezier(0.32, 1.32, 0.32, 1);
   pointer-events: none;
 }
@@ -292,7 +328,7 @@ body:has(.overlay) .tabbar {
   z-index: 1;
   padding: 13px 0;
   border-radius: 999px;
-  color: var(--ink-3);
+  color: var(--ink-small);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -316,20 +352,20 @@ body:has(.overlay) .tabbar {
 /* ---------- typography (Apple scale) ---------- */
 h1 {
   /* large title */
-  font-size: 34px;
+  font-size: 36px;
   font-weight: 700;
-  letter-spacing: -0.4px;
-  line-height: 1.12;
+  letter-spacing: -0.7px;
+  line-height: 1.08;
   margin-bottom: 4px;
 }
 h2 {
   /* grouped-list section header */
-  font-size: 13px;
-  font-weight: 500;
+  font-size: 12.5px;
+  font-weight: 600;
   color: var(--ink-small);
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  margin: 32px 0 8px 4px;
+  letter-spacing: 0.06em;
+  margin: 34px 0 10px 4px;
 }
 .screen-cap {
   /* subheadline above large title */
@@ -345,10 +381,14 @@ h2 {
 .hero {
   font-family: var(--round);
   font-weight: 700;
-  font-size: 54px;
-  line-height: 1;
-  letter-spacing: -0.5px;
+  /* the display moment — scales with the column so long figures like
+     -$12,450 still fit the 430px template without wrapping */
+  font-size: clamp(50px, 15.5vw, 64px);
+  line-height: 0.98;
+  letter-spacing: -1.6px;
   font-variant-numeric: tabular-nums;
+  /* lifts the numeral off the felt the way a lit object sits on a table */
+  text-shadow: 0 2px 20px rgba(0, 0, 0, 0.45);
 }
 /* one line under a hero number, naming where the figure came from */
 .hero-sub {
@@ -366,9 +406,11 @@ h2 {
 .statline .stat b {
   display: block;
   font-family: var(--round);
-  font-size: 17px;
+  font-size: 19px;
   font-weight: 600;
+  letter-spacing: -0.3px;
   font-variant-numeric: tabular-nums;
+  margin-bottom: 3px;
 }
 .statline .stat span {
   font-size: 11px;
@@ -380,11 +422,13 @@ h2 {
 
 /* ---------- inset-grouped lists ---------- */
 .group {
-  background: color-mix(in srgb, var(--felt-800) 58%, transparent);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  position: relative;
+  background: color-mix(in srgb, var(--felt-800) 62%, transparent);
+  background-image: var(--card-fill);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--glass-shine);
+  box-shadow: var(--spec), var(--lift-2);
   border-radius: var(--r-card);
   overflow: hidden;
 }
@@ -397,24 +441,34 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-height: 50px;
+  min-height: 52px;
   border-radius: 999px;
   background: var(--glass);
-  box-shadow: var(--glass-shine);
+  background-image: var(--card-fill);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--spec), var(--lift-1);
   font-size: 17px;
   font-weight: 600;
   letter-spacing: -0.02em;
   padding: 0 20px;
-  transition: transform 120ms var(--ease-out), background 120ms ease, opacity 120ms ease;
+  transition: transform 120ms var(--ease-out), background 120ms ease, opacity 120ms ease,
+    box-shadow 120ms ease;
 }
 .btn:active {
   transform: scale(0.97);
   background: var(--glass-strong);
+  box-shadow: var(--spec), 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 .btn.primary {
   background: var(--brass);
+  background-image: linear-gradient(180deg, var(--brass-bright), var(--brass));
+  border-color: transparent;
   color: #241b06;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), 0 4px 14px rgba(0, 0, 0, 0.35);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.45),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12),
+    0 3px 10px rgba(0, 0, 0, 0.32),
+    0 10px 28px rgba(160, 118, 40, 0.22);
 }
 .btn.primary:active {
   background: var(--brass-bright);
@@ -430,11 +484,13 @@ h2 {
   gap: 8px;
 }
 .chip {
-  min-height: 38px;
+  min-height: 44px;
   padding: 0 15px;
   border-radius: 999px;
   background: var(--glass);
-  box-shadow: var(--glass-shine);
+  background-image: var(--card-fill);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--spec), var(--lift-1);
   font-size: 15px;
   font-weight: 500;
   letter-spacing: -0.01em;
@@ -449,13 +505,26 @@ h2 {
 }
 .chip.on {
   background: var(--brass);
+  background-image: linear-gradient(180deg, var(--brass-bright), var(--brass));
+  border-color: transparent;
   color: #241b06;
   font-weight: 600;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 10px rgba(0, 0, 0, 0.3);
 }
 .chip.sm {
   min-height: 32px;
   padding: 0 12px;
   font-size: 13px;
+  position: relative;
+}
+/* Compact pills stay visually compact but tap like full-size controls: the
+   hit area is extended past the paint to clear the 44px floor. These sit on
+   the hand-entry hot path, where a missed tap costs more than a large pill. */
+.chip.sm::after {
+  content: '';
+  position: absolute;
+  inset: -6px -2px;
+  border-radius: inherit;
 }
 .tag-badge {
   font-size: 11px;
@@ -488,11 +557,13 @@ h2 {
 .bankroll-dot {
   position: absolute;
   right: 0;
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 999px;
   transform: translate(50%, -50%);
-  box-shadow: 0 0 0 3px var(--felt-950);
+  /* separates the marker from the line it terminates without stamping a
+     page-coloured hole through whatever surface the chart is sitting on */
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.35), 0 0 10px 1px currentColor;
 }
 .bankroll-axis {
   display: flex;
@@ -511,6 +582,88 @@ h2 {
   justify-content: space-between;
   align-items: baseline;
   gap: 10px;
+}
+
+/* stats sitting inside a panel share its surface, so the divider is a
+   hairline rather than the panel's own top border */
+.panel .hero {
+  font-size: clamp(46px, 13.5vw, 58px);
+}
+.panel-stats {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sep);
+}
+
+/* ---------- live session panel ---------- */
+.live-panel {
+  padding: 16px 18px 15px;
+}
+
+/* Third tier of controls: present, reachable, not competing with the money
+   actions above. Flat rather than raised — a surface that isn't lifted reads
+   as lower priority without needing to be smaller or greyer. */
+.quiet-tier {
+  display: flex;
+  gap: 10px;
+  margin: 16px 0 10px;
+}
+.btn.quiet {
+  min-height: 46px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-2);
+  background: transparent;
+  background-image: none;
+  border-color: var(--glass-edge);
+  box-shadow: none;
+}
+.btn.quiet:active {
+  background: var(--glass);
+  box-shadow: none;
+}
+/* the action that closes the books — weighted, not alarming */
+.btn.edge {
+  color: var(--brass-bright);
+  border-color: var(--brass-hairline);
+}
+.live-status {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass);
+  margin-bottom: 8px;
+}
+/* a session in progress breathes; on break it holds still */
+.live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--win);
+  margin-right: 5px;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 0 rgba(79, 209, 131, 0.5);
+  animation: live-pulse 2.4s var(--ease-out) infinite;
+}
+.live-dot.paused {
+  background: var(--ink-3);
+  animation: none;
+  box-shadow: none;
+}
+@keyframes live-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(79, 209, 131, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 7px rgba(79, 209, 131, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(79, 209, 131, 0);
+  }
 }
 
 /* ---------- forms ---------- */
@@ -535,8 +688,27 @@ label {
   display: flex;
   align-items: center;
   background: var(--glass);
-  box-shadow: var(--glass-shine);
+  background-image: var(--card-fill);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--spec), var(--lift-1);
   border-radius: 999px;
+}
+/* quiet-tier variant: flat, shorter, still a 44px target */
+.stepper.sm {
+  flex: 1;
+  background: transparent;
+  background-image: none;
+  box-shadow: none;
+}
+.stepper.sm button {
+  width: 50px;
+  height: 46px;
+  font-size: 20px;
+}
+.stepper.sm span {
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--ink-2);
 }
 .stepper button {
   width: 56px;
@@ -559,6 +731,7 @@ label {
 
 /* ---------- playing cards ---------- */
 .mini-card {
+  position: relative;
   display: inline-flex;
   flex-direction: column;
   align-items: center;
@@ -574,6 +747,13 @@ label {
   font-size: 20px;
   line-height: 1;
   gap: 1px;
+}
+/* card slots are 40px wide — widen the tap area to the 44px floor without
+   changing the card proportions, which have to stay card-shaped */
+button.mini-card::after {
+  content: '';
+  position: absolute;
+  inset: 0 -2px;
 }
 .mini-card .suit {
   font-size: 13px;
@@ -901,20 +1081,20 @@ label {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 11px 14px;
+  padding: 13px 16px;
   width: 100%;
-  min-height: 58px;
+  min-height: 62px;
   transition: background 120ms ease;
 }
 .hand-row:active { background: var(--glass-strong); }
 .hand-row .meta { flex: 1; min-width: 0; }
 .hand-row .meta .line1 {
   display: flex;
-  gap: 6px;
+  gap: 7px;
   align-items: center;
   font-weight: 600;
-  font-size: 15px;
-  letter-spacing: -0.01em;
+  font-size: 15.5px;
+  letter-spacing: -0.015em;
 }
 .hand-row .meta .line2 {
   font-size: 13px;
@@ -927,7 +1107,8 @@ label {
   text-overflow: ellipsis;
 }
 .hand-row .result {
-  font-size: 16px;
+  font-size: 17px;
+  letter-spacing: -0.3px;
   text-align: right;
   flex-shrink: 0;
 }
@@ -940,14 +1121,30 @@ label {
 }
 
 .session-card {
-  background: color-mix(in srgb, var(--felt-800) 58%, transparent);
-  backdrop-filter: blur(14px) saturate(160%);
-  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  background: color-mix(in srgb, var(--felt-800) 62%, transparent);
+  background-image: var(--card-fill);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
   border: 1px solid var(--glass-edge);
-  box-shadow: var(--glass-shine);
+  box-shadow: var(--spec), var(--lift-2);
   border-radius: var(--r-card);
-  padding: 16px;
+  padding: 18px;
   margin-bottom: 12px;
+}
+
+/* The hero surface: chart, live-session readout — the one card per screen
+   that should read as genuinely floating rather than merely grouped. */
+.panel {
+  position: relative;
+  background: color-mix(in srgb, var(--felt-800) 56%, transparent);
+  background-image: var(--card-fill);
+  backdrop-filter: var(--card-blur);
+  -webkit-backdrop-filter: var(--card-blur);
+  border: 1px solid var(--glass-edge);
+  box-shadow: var(--spec-strong), var(--lift-3);
+  border-radius: var(--r-card);
+  padding: 18px 16px 14px;
+  margin-bottom: 18px;
 }
 
 /* ---------- stats ---------- */
@@ -1036,18 +1233,28 @@ label {
 .theme-swatch .small { font-size: 10.5px; line-height: 1.3; }
 
 /* ---------- empty states ---------- */
+/* Column layout so an icon stacks above the copy instead of sitting inline
+   with the first line of text. */
 .empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
   text-align: center;
   color: var(--ink-small);
-  padding: 44px 32px;
+  padding: 40px 28px;
   font-size: 15px;
   letter-spacing: -0.01em;
   line-height: 1.5;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--glass-edge);
+  border-radius: var(--r-card);
+  box-shadow: var(--spec);
 }
 .empty-state svg {
-  margin-bottom: 12px;
   color: var(--brass);
-  opacity: 0.5;
+  opacity: 0.6;
+  flex-shrink: 0;
 }
 
 /* ---------- contrast safety ----------
@@ -1068,12 +1275,44 @@ label {
   }
 }
 
-/* ---------- motion safety ---------- */
+/* ---------- motion safety ----------
+   Reduce Motion asks for less vestibular motion, not for no feedback. A blanket
+   0.01ms kill also removes the press response, the tab-colour change, and the
+   toast — leaving controls that feel broken. So: drop the travel (slides,
+   parallax, scaling), keep the state changes (colour, opacity) and crossfade
+   what used to slide. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+  .tab-view.slide-left,
+  .tab-view.slide-right {
+    animation: fade-in 160ms linear;
+  }
+  .overlay {
+    animation: fade-in 160ms linear;
+  }
+  .tab-lens {
+    transition: transform 0.01ms linear;
+  }
+  .btn:active,
+  .chip:active,
+  .tabbar button:active svg,
+  .tabbar button.active svg,
+  .hand-row:active {
+    transform: none;
+  }
+  .toast {
+    animation: fade-in 160ms linear;
+  }
+  /* the live dot keeps its colour, loses its pulse */
+  .live-dot {
+    animation: none;
+    box-shadow: none;
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
   }
 }

@@ -93,37 +93,41 @@ export function SessionsTab({ onToast }: { onToast: (msg: string) => void }) {
 
   return (
     <div className="view">
-      <p className="screen-cap">
-        {t.sessions === 0
-          ? 'Bankroll'
-          : `${t.sessions} session${t.sessions === 1 ? '' : 's'} · ${fmtDuration(t.ms)} played`}
-      </p>
+      <p className="screen-cap">Bankroll</p>
       <h1 className={`money hero ${t.net >= 0 ? 'pos-win' : 'pos-lose'}`}>{fmtSigned(t.net)}</h1>
+      <p className="hero-sub small">
+        {t.sessions === 0
+          ? 'No finished sessions yet'
+          : `${t.sessions} session${t.sessions === 1 ? '' : 's'} · ${fmtDuration(t.ms)} at the table`}
+      </p>
 
-      <div className="statline" style={{ marginBottom: 20 }}>
-        <div className="stat">
-          <b className={`money ${(t.hourly ?? 0) >= 0 ? 'pos-win' : 'pos-lose'}`}>
-            {t.hourly !== null ? fmtSigned(t.hourly) : '—'}
-          </b>
-          <span>per hour</span>
-        </div>
-        <div className="stat">
-          <b className="num">{t.wonPct !== null ? `${t.wonPct}%` : '—'}</b>
-          <span>sessions won</span>
-        </div>
-        <div className="stat">
-          <b className="num">{fmtDuration(t.ms)}</b>
-          <span>at the table</span>
+      {/* Chart and the rates it produces belong on one surface — they're one
+          reading, not three things that happen to be stacked. */}
+      <div className="panel" style={{ marginTop: 20 }}>
+        {curve.length > 0 ? (
+          <BankrollChart points={curve} />
+        ) : (
+          <p className="small dim" style={{ lineHeight: 1.5, padding: '18px 2px' }}>
+            Your bankroll line appears once you cash out of a session.
+          </p>
+        )}
+        <div className="statline panel-stats">
+          <div className="stat">
+            <b className={`money ${(t.hourly ?? 0) >= 0 ? 'pos-win' : 'pos-lose'}`}>
+              {t.hourly !== null ? fmtSigned(t.hourly) : '—'}
+            </b>
+            <span>per hour</span>
+          </div>
+          <div className="stat">
+            <b className="num">{t.wonPct !== null ? `${t.wonPct}%` : '—'}</b>
+            <span>sessions won</span>
+          </div>
+          <div className="stat">
+            <b className="num">{t.best !== null ? fmtSigned(t.best) : '—'}</b>
+            <span>best night</span>
+          </div>
         </div>
       </div>
-
-      {curve.length > 0 && <BankrollChart points={curve} />}
-
-      {t.sessions === 0 && (
-        <p className="small dim" style={{ lineHeight: 1.5, marginTop: 4 }}>
-          Your bankroll line appears once you cash out of a session.
-        </p>
-      )}
 
       {byMonth.map((g) => (
         <div key={g.label}>

@@ -83,9 +83,10 @@ export function BankrollChart({
             vectorEffect="non-scaling-stroke"
           />
         </svg>
+        {/* color drives the glow in .bankroll-dot's box-shadow (currentColor) */}
         <span
           className="bankroll-dot"
-          style={{ top: `${geom.markerTopPct}%`, background: tint }}
+          style={{ top: `${geom.markerTopPct}%`, background: tint, color: tint }}
         />
       </div>
       {/* These are the vertical range, not the endpoints — labelled explicitly,

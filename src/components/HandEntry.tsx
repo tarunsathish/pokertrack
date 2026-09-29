@@ -256,7 +256,7 @@ export function HandEntry({ session, defaultPos, draft, tagPresets, onSave, onCl
           <div style={{ flex: 'none' }}>
             <button
               className="small dim"
-              style={{ marginBottom: 4, display: 'block', padding: '8px 10px', margin: '-8px -10px -4px', minHeight: 40 }}
+              style={{ marginBottom: 4, display: 'block', padding: '10px', margin: '-10px -10px -4px', minHeight: 44 }}
               onClick={() => setPosEdit(true)}
             >
               You · <b style={{ color: 'var(--brass)' }}>{heroPos}</b> <span className="faint">✎</span>
