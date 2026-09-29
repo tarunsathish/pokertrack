@@ -1204,6 +1204,8 @@ button.mini-card::after {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 10px;
+  /* the next block is a separate concern, not part of the felt picker */
+  margin-bottom: 26px;
 }
 .theme-swatch {
   display: flex;
