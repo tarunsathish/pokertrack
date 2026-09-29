@@ -29,6 +29,12 @@
   --ink-2: rgba(240, 236, 224, 0.62);
   --ink-3: rgba(240, 236, 224, 0.36);
   --ink-4: rgba(240, 236, 224, 0.16);
+  /* Small functional text — caps section headers, field labels, stat labels,
+     row metadata, placeholders. Apple's tertiaryLabel (and our --ink-3 at .36)
+     measures 3.00:1 on felt, under the 4.5:1 floor these carry as real text.
+     0.56 is the lowest step clearing 4.5:1 on the felt-950/900/800 rungs.
+     --ink-3 stays .36 for genuinely decorative, non-essential marks. */
+  --ink-small: rgba(240, 236, 224, 0.56);
 
   /* data */
   --win: #4fd183;
@@ -161,7 +167,7 @@ textarea {
 }
 input::placeholder,
 textarea::placeholder {
-  color: var(--ink-3);
+  color: var(--ink-small);
 }
 input:focus,
 textarea:focus {
@@ -170,6 +176,19 @@ textarea:focus {
 :focus-visible {
   outline: 2px solid var(--brass);
   outline-offset: 2px;
+}
+
+/* Browser surfaces we didn't draw still carry the design: selection is tinted
+   from the accent rather than shipping the OS blue. Card stock gets its own
+   pairing so selected text on cream stays legible. */
+::selection {
+  background: rgba(216, 181, 115, 0.3);
+  color: var(--ink);
+}
+.card ::selection,
+.stock ::selection {
+  background: rgba(36, 29, 16, 0.18);
+  color: var(--ink-stock);
 }
 
 /* numerals & voices */
@@ -255,7 +274,8 @@ body:has(.overlay) .tabbar {
   top: 5px;
   bottom: 5px;
   left: 6px;
-  width: calc((100% - 12px) / 4);
+  /* driven by App.tsx so the lens can never drift out of sync with the tab count */
+  width: calc((100% - 12px) / var(--tab-count, 4));
   border-radius: 999px;
   background: var(--glass-strong);
   box-shadow: var(--glass-shine);
@@ -306,7 +326,7 @@ h2 {
   /* grouped-list section header */
   font-size: 13px;
   font-weight: 500;
-  color: var(--ink-3);
+  color: var(--ink-small);
   text-transform: uppercase;
   letter-spacing: 0.03em;
   margin: 32px 0 8px 4px;
@@ -330,6 +350,12 @@ h2 {
   letter-spacing: -0.5px;
   font-variant-numeric: tabular-nums;
 }
+/* one line under a hero number, naming where the figure came from */
+.hero-sub {
+  margin-top: 7px;
+  line-height: 1.4;
+  color: var(--ink-2);
+}
 .statline {
   display: flex;
   gap: 26px;
@@ -349,7 +375,7 @@ h2 {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--ink-3);
+  color: var(--ink-small);
 }
 
 /* ---------- inset-grouped lists ---------- */
@@ -440,6 +466,52 @@ h2 {
   padding: 3px 7px;
   color: var(--ink-2);
 }
+/* a session still in progress — the accent earns it, status reads as a tint */
+.tag-badge.live {
+  color: var(--brass-bright);
+  background: var(--brass-hairline);
+}
+
+/* ---------- bankroll curve ---------- */
+.bankroll {
+  margin: 4px 0 8px;
+}
+.bankroll-plot {
+  position: relative;
+}
+.bankroll-plot svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.bankroll-dot {
+  position: absolute;
+  right: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  transform: translate(50%, -50%);
+  box-shadow: 0 0 0 3px var(--felt-950);
+}
+.bankroll-axis {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 6px;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: var(--ink-small);
+}
+
+/* month bucket heading with its own subtotal on the right */
+.month-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
 
 /* ---------- forms ---------- */
 .field { margin-bottom: 16px; }
@@ -450,7 +522,7 @@ label {
   font-weight: 500;
   text-transform: uppercase;
   letter-spacing: 0.03em;
-  color: var(--ink-3);
+  color: var(--ink-small);
   margin-bottom: 6px;
 }
 .row {
@@ -618,7 +690,7 @@ label {
   font-variant-numeric: tabular-nums;
 }
 .timeline .t-street {
-  color: var(--ink-3);
+  color: var(--ink-small);
   font-weight: 600;
   text-transform: uppercase;
   font-size: 11px;
@@ -848,7 +920,7 @@ label {
   font-size: 13px;
   letter-spacing: -0.01em;
   font-variant-numeric: tabular-nums;
-  color: var(--ink-3);
+  color: var(--ink-small);
   margin-top: 2px;
   white-space: nowrap;
   overflow: hidden;
@@ -966,7 +1038,7 @@ label {
 /* ---------- empty states ---------- */
 .empty-state {
   text-align: center;
-  color: var(--ink-3);
+  color: var(--ink-small);
   padding: 44px 32px;
   font-size: 15px;
   letter-spacing: -0.01em;
@@ -976,6 +1048,24 @@ label {
   margin-bottom: 12px;
   color: var(--brass);
   opacity: 0.5;
+}
+
+/* ---------- contrast safety ----------
+   Increased-contrast users get the whole ink ladder stepped up and the
+   hairlines made real, the way iOS raises separator opacity rather than
+   redrawing the interface. */
+@media (prefers-contrast: more) {
+  :root {
+    --ink-2: rgba(240, 236, 224, 0.82);
+    --ink-3: rgba(240, 236, 224, 0.62);
+    --ink-small: rgba(240, 236, 224, 0.78);
+    --sep: rgba(240, 236, 224, 0.26);
+    --glass-edge: rgba(255, 255, 255, 0.3);
+    --brass-hairline: rgba(216, 181, 115, 0.4);
+  }
+  .tab-lens {
+    border-color: var(--brass);
+  }
 }
 
 /* ---------- motion safety ---------- */

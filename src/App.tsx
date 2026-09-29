@@ -1,20 +1,24 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { PlayTab } from './components/PlayTab'
 import { HandsTab } from './components/HandsTab'
+import { SessionsTab } from './components/SessionsTab'
 import { StatsTab } from './components/StatsTab'
 import { SettingsTab } from './components/SettingsTab'
-import { SpadeIcon, CardsIcon, ChartIcon, SlidersIcon } from './components/Icons'
+import { SpadeIcon, CardsIcon, ChipStackIcon, ChartIcon, SlidersIcon } from './components/Icons'
 
-type Tab = 'play' | 'hands' | 'stats' | 'settings'
+type Tab = 'play' | 'hands' | 'sessions' | 'stats' | 'settings'
 
+// Five top-level sections is the platform ceiling for a tab bar; sections only,
+// never actions. Order runs live work → records → analysis → config.
 const TABS: { id: Tab; label: string; ico: React.ComponentType }[] = [
   { id: 'play', label: 'Play', ico: SpadeIcon },
   { id: 'hands', label: 'Hands', ico: CardsIcon },
+  { id: 'sessions', label: 'Sessions', ico: ChipStackIcon },
   { id: 'stats', label: 'Stats', ico: ChartIcon },
   { id: 'settings', label: 'Settings', ico: SlidersIcon }
 ]
 
-const TAB_ORDER: Tab[] = ['play', 'hands', 'stats', 'settings']
+const TAB_ORDER: Tab[] = TABS.map((t) => t.id)
 
 export default function App() {
   const [tab, setTab] = useState<Tab>('play')
@@ -119,6 +123,7 @@ export default function App() {
       >
         {tab === 'play' && <PlayTab onToast={showToast} />}
         {tab === 'hands' && <HandsTab seed={handsSeed} onSeedConsumed={() => setHandsSeed(null)} />}
+        {tab === 'sessions' && <SessionsTab onToast={showToast} />}
         {tab === 'stats' && (
           <StatsTab
             onReview={() => {
@@ -132,6 +137,7 @@ export default function App() {
 
       <nav
         className="tabbar"
+        style={{ ['--tab-count' as string]: TABS.length }}
         ref={barRef}
         onTouchMove={onBarTouchMove}
         onTouchEnd={onBarTouchEnd}

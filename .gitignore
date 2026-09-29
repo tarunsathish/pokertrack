@@ -14,6 +14,13 @@ dist-ssr/
 .env.*
 !.env.example
 
+# impeccable: ephemeral run state, plus the binary//data the installer fetches
+# (re-create with `npx impeccable install`). The skill prompts and agent
+# definitions under .claude are committed; the generated payload is not.
+.impeccable/
+.claude/skills/impeccable/scripts/
+.claude/settings.local.json
+
 # editor / OS
 .DS_Store
 *.log

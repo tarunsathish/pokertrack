@@ -2,6 +2,14 @@ import { useMemo, useState } from 'react'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db, sessionInvested, type Session, type HandRecord } from '../db'
 import { fmt, fmtSigned, parseCents, type Cents } from '../engine/money'
+import {
+  fmtAgo,
+  fmtDuration,
+  netLive,
+  onBreak,
+  tableMs,
+  STACK_STALE_MS
+} from '../engine/sessions'
 import { nextPosition, positionsFor } from '../engine/positions'
 import { loadSettings, saveSettings, rememberStakes, type AppSettings } from '../settings'
 import { HandEntry, loadDraft, type Draft } from './HandEntry'
@@ -125,7 +133,9 @@ function EndSessionForm({ session, onDone, onCancel }: {
   onDone: (cashOut: Cents) => void
   onCancel: () => void
 }) {
-  const [text, setText] = useState('')
+  // Prefilled from the last stack count when there is one — racking up rarely
+  // changes the number, so confirming beats retyping.
+  const [text, setText] = useState(session.stack ? fmt(session.stack.amount).slice(1) : '')
   const cashOut = parseCents(text)
   return (
     <div className="session-card">
@@ -174,12 +184,49 @@ function RebuyForm({ session, onDone, onCancel }: {
   )
 }
 
+/**
+ * Optional stack count. Never required: without one the session still reports a
+ * true result at cash-out, so this exists to make the live number honest, not
+ * to add a chore between hands.
+ */
+function StackForm({ session, onDone, onCancel }: {
+  session: Session
+  onDone: (amount: Cents) => void
+  onCancel: () => void
+}) {
+  const [text, setText] = useState(session.stack ? fmt(session.stack.amount).slice(1) : '')
+  const amount = parseCents(text)
+  return (
+    <div className="session-card">
+      <div className="field">
+        <label>Count your stack — what's in front of you right now?</label>
+        <MoneyInput value={text} onChange={setText} placeholder={fmt(sessionInvested(session)).slice(1)} />
+      </div>
+      <div className="row">
+        <button className="btn" onClick={onCancel}>
+          Cancel
+        </button>
+        <button
+          className="btn primary"
+          disabled={amount === null}
+          onClick={() => amount !== null && onDone(amount)}
+        >
+          Save count
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
   const [settings, setSettings] = useState(loadSettings)
   const [entryOpen, setEntryOpen] = useState(false)
   const [draft, setDraft] = useState<Draft | null>(null)
   const [ending, setEnding] = useState(false)
   const [rebuying, setRebuying] = useState(false)
+  const [counting, setCounting] = useState(false)
+  const [noteOpen, setNoteOpen] = useState(false)
+  const [noteText, setNoteText] = useState('')
   const [openHandId, setOpenHandId] = useState<number | null>(null)
 
   // null = "no active session" (show setup); undefined = still loading.
@@ -230,24 +277,40 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
   }
   const hasDraft = loadDraft(session.id!) !== null
 
-  const hours = (Date.now() - session.startedAt) / 3600000
+  const now = Date.now()
+  const paused = onBreak(session)
+  const live = netLive(session)
+  // The hero number prefers a real stack count; without one it falls back to
+  // the sum of logged hands, which is what this screen always showed.
+  const heroValue = live ?? handsResult
+  const stackStale = session.stack ? now - session.stack.ts > STACK_STALE_MS : false
 
   return (
     <div className="view">
       <p className="screen-cap num">
-        Live · {fmt(session.sb)}/{fmt(session.bb)}
+        {paused ? 'On break' : 'Live'} · {fmt(session.sb)}/{fmt(session.bb)}
         {session.venue ? ` · ${session.venue}` : ''}
       </p>
-      <h1 className={`money hero ${handsResult >= 0 ? 'pos-win' : 'pos-lose'}`}>
-        {fmtSigned(handsResult)}
+      <h1 className={`money hero ${heroValue >= 0 ? 'pos-win' : 'pos-lose'}`}>
+        {fmtSigned(heroValue)}
       </h1>
-      <div className="statline" style={{ marginBottom: 28 }}>
+      <p className="hero-sub small">
+        {live !== null ? (
+          <>
+            from your {fmt(session.stack!.amount)} stack
+            {stackStale && <span className="faint"> · counted {fmtAgo(session.stack!.ts, now)}</span>}
+          </>
+        ) : (
+          <span className="dim">across {hands?.length ?? 0} logged hands — count your stack for a true figure</span>
+        )}
+      </p>
+      <div className="statline" style={{ marginBottom: 20 }}>
         <div className="stat">
           <b className="num">{hands?.length ?? 0}</b>
           <span>hands logged</span>
         </div>
         <div className="stat">
-          <b className="num">{hours < 1 ? `${Math.round(hours * 60)}m` : `${hours.toFixed(1)}h`}</b>
+          <b className="num">{fmtDuration(tableMs(session, now))}</b>
           <span>at the table</span>
         </div>
         <div className="stat">
@@ -261,6 +324,31 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
       <button className="btn big primary" onClick={openEntry} style={{ marginBottom: 10 }}>
         {hasDraft ? 'Resume hand in progress' : 'Log a hand'}
       </button>
+
+      <div className="row" style={{ marginBottom: 10 }}>
+        <button className="btn" onClick={() => setCounting(true)}>
+          {session.stack ? 'Recount stack' : 'Count stack'}
+        </button>
+        <button
+          className={`btn${paused ? ' primary' : ''}`}
+          onClick={async () => {
+            const breaks = session.breaks ?? []
+            if (paused) {
+              await db.sessions.update(session.id!, {
+                breaks: breaks.map((b) => (b.end === null ? { ...b, end: Date.now() } : b))
+              })
+              onToast('Back at the table')
+            } else {
+              await db.sessions.update(session.id!, {
+                breaks: [...breaks, { start: Date.now(), end: null }]
+              })
+              onToast('On break — the clock is paused')
+            }
+          }}
+        >
+          {paused ? 'Back to table' : 'Take a break'}
+        </button>
+      </div>
 
       <div className="row" style={{ marginBottom: 10 }}>
         <div className="stepper">
@@ -296,6 +384,16 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
             onToast(`Rebuy ${fmt(amount)} · in for ${fmt(sessionInvested(session) + amount)}`)
           }}
         />
+      ) : counting ? (
+        <StackForm
+          session={session}
+          onCancel={() => setCounting(false)}
+          onDone={async (amount) => {
+            await db.sessions.update(session.id!, { stack: { amount, ts: Date.now() } })
+            setCounting(false)
+            onToast(`Stack ${fmt(amount)} · ${fmtSigned(amount - sessionInvested(session))}`)
+          }}
+        />
       ) : (
         <div className="row">
           <button className="btn big" onClick={() => setRebuying(true)}>
@@ -305,6 +403,33 @@ export function PlayTab({ onToast }: { onToast: (msg: string) => void }) {
             End session
           </button>
         </div>
+      )}
+
+      {noteOpen ? (
+        <div style={{ marginTop: 14 }}>
+          <textarea
+            rows={3}
+            autoFocus
+            placeholder="Table read, how you're running, why you're staying or leaving."
+            value={noteText}
+            onChange={(e) => setNoteText(e.target.value)}
+            onBlur={async () => {
+              await db.sessions.update(session.id!, { note: noteText.trim() })
+              setNoteOpen(false)
+            }}
+          />
+        </div>
+      ) : (
+        <button
+          className="btn"
+          style={{ width: '100%', marginTop: 14 }}
+          onClick={() => {
+            setNoteText(session.note ?? '')
+            setNoteOpen(true)
+          }}
+        >
+          {session.note ? 'Edit session note' : 'Add a session note'}
+        </button>
       )}
 
       {lastHand && (

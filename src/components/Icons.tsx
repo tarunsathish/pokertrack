@@ -37,6 +37,17 @@ export function SlidersIcon() {
   )
 }
 
+/** Chip stack — sessions. Reads as bankroll without borrowing the Stats trend line. */
+export function ChipStackIcon() {
+  return (
+    <svg {...P}>
+      <ellipse cx="12" cy="17.6" rx="7.8" ry="2.9" />
+      <ellipse cx="12" cy="13.2" rx="7.8" ry="2.9" opacity="0.62" />
+      <ellipse cx="12" cy="8.8" rx="7.8" ry="2.9" opacity="0.34" />
+    </svg>
+  )
+}
+
 /** Poker-chip dashed ring — the one domain mark. Used for live-session + empty states only. */
 export function ChipRing({ size = 44, color = 'currentColor' }: { size?: number; color?: string }) {
   return (
